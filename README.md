@@ -32,7 +32,7 @@ pip install psycopg fastapi uvicorn
 ```
 
 ## Database setup
-- You need a user called "weatherman" (or whatever you like - just remember to change the username in the config.yaml)
+- You need a user called "weatherman" (or whatever you like - just remember to change the username in the config.yaml and create_db.py)
 - Run `python create_db.py` to create the data storage tabel.
 
 ## Run the site
