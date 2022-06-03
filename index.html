@@ -1084,6 +1084,10 @@
         methods:
             {
                 async fetch_data(days, hours) {
+                    var target_lang = localStorage.getItem('trn_name');
+                    if (target_lang == "null") {
+                        target_lang = "en";
+                    }
                     var out_data;
                     var opts = [];
                     var index = 0;
@@ -1115,10 +1119,10 @@
                     }
                     this.option.visualMap[0].max = outdoor_max;
                     this.option.visualMap[0].min = outdoor_min;
-                    this.option.visualMap[0].text = ["Outdoor\r\n" + outdoor_max.toString(), outdoor_min.toString()];
+                    this.option.visualMap[0].text = [other_tooltip_translate[target_lang].temp_out + "\r\n" + outdoor_max.toString(), outdoor_min.toString()];
                     this.option.visualMap[1].max = indoor_max;
                     this.option.visualMap[1].min = indoor_min;
-                    this.option.visualMap[1].text = ["Indoor\r\n" + indoor_max.toString(), indoor_min.toString()];
+                    this.option.visualMap[1].text = [other_tooltip_translate[target_lang].temp_in + "\r\n" + indoor_max.toString(), indoor_min.toString()];
 
                     this.option.series[0].data = out_data;
                     this.option.series[1].data = out_data;
@@ -1327,8 +1331,8 @@
                         {
                             type: 'text',
                             z:100,
-                            left: 'right',
-                            top: 'center',
+                            left: 'left',
+                            top: 'top',
                             style: {
                                 text:""
                             }
@@ -1377,7 +1381,7 @@
                     this.option.series[0].data = out_data;
 
                     //this.option.series[0].markPoint.data[2].yAxis = out_data[out_data.length-1][baro_dims.baro];
-                    this.option.graphic[0].style.text = other_tooltip_translate[target_lang].current_baro + ": " + out_data[out_data.length-1][baro_dims.baro]  + " hPa";
+                    this.option.graphic[0].style.text = other_tooltip_translate[target_lang].current_baro + ": " + out_data[out_data.length - 1][baro_dims.baro] + " hPa";
                     //this.option.series[1].data = out_data;
                     this.$forceUpdate()
 
