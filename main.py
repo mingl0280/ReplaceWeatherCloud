@@ -184,6 +184,7 @@ def get_interval_where_str(prior_days, prior_hrs):
 async def get_wind(prior_days: Optional[int] = Query(None, alias="priorDays"),
                    prior_hrs: Optional[int] = Query(None, alias="priorHrs")):
     global db_conn
+    check_db()
     where_str = get_interval_where_str(prior_days, prior_hrs)
 
     sql_query_str = \
@@ -199,6 +200,7 @@ async def get_wind(prior_days: Optional[int] = Query(None, alias="priorDays"),
 async def get_solar(prior_days: Optional[int] = Query(None, alias="priorDays"),
                     prior_hrs: Optional[int] = Query(None, alias="priorHrs")):
     global db_conn
+    check_db()
     where_str = get_interval_where_str(prior_days, prior_hrs)
     sql_query_str = "SELECT localdatetime AS \"Time\", solarrad as \"Solar\" FROM weather_data " + where_str + \
                     " ORDER BY localdatetime DESC"
@@ -206,10 +208,14 @@ async def get_solar(prior_days: Optional[int] = Query(None, alias="priorDays"),
     data = result.fetchall()
     return_data = []
     for item in data:
-        return_data.append([
-            item["Time"],
-            item["Solar"]
-        ])
+        try:
+            return_data.append([
+                item["Time"],
+                item["Solar"]
+            ])
+        except:
+            db_conn.close()
+            db_conn = psycopg.connect(cfg_items["database"]["connection_str"])
 
     return return_data
 
@@ -218,6 +224,7 @@ async def get_solar(prior_days: Optional[int] = Query(None, alias="priorDays"),
 async def get_rain(prior_days: Optional[int] = Query(None, alias="priorDays"),
                    prior_hrs: Optional[int] = Query(None, alias="priorHrs")):
     global db_conn
+    check_db()
     where_str = get_interval_where_str(prior_days, prior_hrs)
     sql_query_str = "SELECT localdatetime AS \"Time\", rainrate as \"Rain\" FROM weather_data " + where_str + \
                     " ORDER BY localdatetime DESC"
@@ -250,6 +257,26 @@ async def get_temp(prior_days: Optional[int] = Query(None, alias="priorDays"),
             item["Time"],
             item["TempOut"],
             item['TempIn']
+        ])
+
+    return return_data
+
+
+@app.get("/api/barometer")
+async def get_baro(prior_days: Optional[int] = Query(None, alias="priorDays"),
+                   prior_hrs: Optional[int] = Query(None, alias="priorHrs")):
+    global db_conn
+    where_str = get_interval_where_str(prior_days, prior_hrs)
+    sql_query_str = "SELECT localdatetime AS \"Time\", barometer as \"Baro\" FROM weather_data " + where_str + \
+                    " ORDER BY localdatetime DESC"
+    result = db_conn.cursor().execute(sql_query_str)
+    data = result.fetchall()
+    return_data = []
+
+    for item in data:
+        return_data.append([
+            item["Time"],
+            item["Baro"]
         ])
 
     return return_data
@@ -417,6 +444,9 @@ async def set_api(wid: str, key: str, tempin: int, humin: int,
     rain_rate = rainrate / 10
     dew_point_outdoor = dew / 10
     dew_point_indoor = dewin / 10
+    if temp_indoor < -100 or solar_radiation < -100 or temp_outdoor < -100 or heat_index_val < -100 or thw < -1000 or \
+            dew_point_outdoor < -100 or dew_point_indoor < -100:
+        return 200
 
     try:
         result = db_conn.cursor().execute("""

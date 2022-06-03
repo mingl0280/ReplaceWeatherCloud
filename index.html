@@ -173,7 +173,10 @@
             <button type="button" class="btn btn-outline-primary other_time_lst" onclick="update_others(7, 0, 7)">
                 7 {{trns.days}}
             </button>
-            <button type="button" class="btn btn-outline-primary other_time_lst" onclick="update_others(30, 0, 8)">
+            <button type="button" class="btn btn-outline-primary other_time_lst" onclick="update_others(14, 0, 8)">
+                14 {{trns.days}}
+            </button>
+            <button type="button" class="btn btn-outline-primary other_time_lst" onclick="update_others(30, 0, 9)">
                 30 {{trns.days}}
             </button>
         </div>
@@ -185,6 +188,9 @@
         <v-chart autoresize :option="option"/>
     </div>
     <div id="SolarPict">
+        <v-chart autoresize :option="option"/>
+    </div>
+    <div id="BaroPict">
         <v-chart autoresize :option="option"/>
     </div>
 </div>
@@ -383,6 +389,10 @@
         time: 0, temp_out: 1, temp_in: 2
     }
 
+    var baro_dims = {
+        time: 0, baro: 1
+    }
+
     var wind_angle_types = {
         "en": {
             0: "N",
@@ -456,6 +466,9 @@
             temp_title: "Temperature",
             solar_tooltip_name: "Power",
             solar_title: "Solar Radiation",
+            barometer: "Barometer",
+            barometer_title: "Barometer History",
+            current_baro: "Current air pressure",
         },
         "zhs": {
             mmhr: "毫米/小时",
@@ -467,6 +480,10 @@
             temp_title: "温度图",
             solar_tooltip_name: "功率",
             solar_title: "太阳辐射量",
+            barometer: "气压",
+            barometer_title: "气压表",
+            current_baro: "当前气压",
+
         }
     }
 
@@ -980,7 +997,8 @@
                             lineStyle: {
                                 color: '#ddd'
                             }
-                        }
+                        },
+                        scale: true
                     }, {
                         axisLine: {show: false},
                         axisTick: {show: false},
@@ -1218,6 +1236,159 @@
             }
     })
 
+    var BaroPict = new Vue({
+        el: "#BaroPict",
+        data: function () {
+            return {
+                option: {
+                    title: {
+                        text: other_tooltip_translate["en"].barometer_title,
+                        left: 'center',
+                    },
+                    tooltip: {
+                        trigger: 'axis',
+                        formatter: function (params) {
+                            var cached_trn_name = localStorage.getItem('trn_name')
+                            return [
+                                echarts.format.formatTime('yyyy-MM-dd', params[0].value[baro_dims.time])
+                                + ' ' + echarts.format.formatTime('hh:mm', params[0].value[baro_dims.time]),
+                                other_tooltip_translate[cached_trn_name].barometer + ': ' +
+                                params[0].value[baro_dims.baro].toString() + 'hpa'
+                            ].join('<br>');
+                        }
+                    },
+                    grid: {
+                        top: 60,
+                        bottom: 60
+                    },
+                    xAxis: {
+                        type: 'time'
+                    },
+                    yAxis: [{
+                        name: 'Value',
+                        nameLocation: 'middle',
+                        nameGap: 35,
+                        axisLine: {
+                            lineStyle: {
+                                color: '#666'
+                            }
+                        },
+                        splitLine: {
+                            lineStyle: {
+                                color: '#ddd'
+                            }
+                        },
+                        scale: true
+                    }, {
+                        axisLine: {show: false},
+                        axisTick: {show: false},
+                        axisLabel: {show: false},
+                        splitLine: {show: false}
+                    }],
+                    visualMap: [{
+                        type: 'continuous',
+                        align: 'center',
+                        left: 'right',
+                        top: 'top',
+                        orient: 'vertical',
+                        itemWidth: 55,
+                        itemHeight: 100,
+                        text: [],
+                        min: 0,
+                        max: 30,
+                        dimension: baro_dims.baro,
+                        inRange: {
+                            color: ['#2e2eff', '#ff0000']
+                        },
+                    }],
+                    dataZoom: [{
+                        type: 'inside',
+                        xAxisIndex: 0,
+                        minSpan: 5
+                    }],
+                    series: [{
+                        type: 'line',
+                        symbol: 'none',
+                        encode: {
+                            x: baro_dims.time,
+                            y: baro_dims.baro
+                        },
+                        markPoint: {
+                            data: [
+                                {type: 'max', name: 'Max', itemStyle: {color: '#ff7300'}},
+                                {type: 'min', name: 'Min', itemStyle: {color: '#0486ad'}},
+                            ]
+                        },
+                        smooth: true,
+                        data: [],
+                        z: 1
+                    }],
+                    graphic:[
+                        {
+                            type: 'text',
+                            z:100,
+                            left: 'right',
+                            top: 'center',
+                            style: {
+                                text:""
+                            }
+                        }
+                    ]
+
+                }
+            }
+        },
+        methods:
+            {
+                async fetch_data(days, hours) {
+                    var target_lang = localStorage.getItem('trn_name');
+                    if (target_lang == "null") {
+                        target_lang = "en";
+                    }
+                    var out_data;
+                    var opts = [];
+                    var index = 0;
+                    if (days != 0) {
+                        opts[index] = "priorDays=" + days.toString()
+                        index++;
+                    }
+                    if (hours != 0) {
+                        opts[index] = "priorHrs=" + hours.toString()
+                    }
+                    if (hours == 0 && days == 0) {
+                        opts[index] = "priorHrs=1"
+                    }
+                    var args = opts.join("&");
+
+                    await axios.get("/api/barometer?" + args).then(function (result) {
+                        out_data = result.data
+                    })
+                    var baro_min = 99999, baro_max = -99999;
+                    for (var idx = 0; idx < out_data.length; idx++) {
+                        if (out_data[idx][baro_dims.baro] > baro_max)
+                            baro_max = out_data[idx][baro_dims.baro];
+                        if (out_data[idx][baro_dims.baro] < baro_min)
+                            baro_min = out_data[idx][baro_dims.baro];
+                    }
+                    this.option.visualMap[0].max = baro_max;
+                    this.option.visualMap[0].min = baro_min;
+                    this.option.visualMap[0].text = [other_tooltip_translate[target_lang].barometer + "\r\n" + baro_max.toString() + " hPa", baro_min.toString() + " hPa"];
+
+                    this.option.series[0].data = out_data;
+
+                    //this.option.series[0].markPoint.data[2].yAxis = out_data[out_data.length-1][baro_dims.baro];
+                    this.option.graphic[0].style.text = other_tooltip_translate[target_lang].current_baro + ": " + out_data[out_data.length-1][baro_dims.baro]  + " hPa";
+                    //this.option.series[1].data = out_data;
+                    this.$forceUpdate()
+
+                },
+                set_translate_objects(trans_name) {
+                    this.option.title.text = other_tooltip_translate[trans_name].barometer_title;
+                    this.$forceUpdate();
+                }
+            }
+    })
+
 
     /* ================================
      *       Update Functions
@@ -1276,6 +1447,7 @@
         other_label_obj.trns = time_label_trns[target_lang];
         TempPict.set_translate_objects(target_lang);
         SolarPict.set_translate_objects(target_lang);
+        BaroPict.set_translate_objects(target_lang);
     }
 
     function UpdateRoseMap(days, hours, elem) {
@@ -1298,6 +1470,7 @@
         RainPict.fetch_data(days, hours);
         TempPict.fetch_data(days, hours);
         SolarPict.fetch_data(days, hours);
+        BaroPict.fetch_data(days, hours);
 
         var btns = document.getElementsByClassName('other_time_lst');
         for (let i = 0; i < btns.length; i++) {

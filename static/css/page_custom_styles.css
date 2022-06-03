@@ -10,7 +10,7 @@
     display: block;
 }
 
-#WindPict, #RainPict, #TempPict, #SolarPict {
+#WindPict, #RainPict, #TempPict, #SolarPict, #BaroPict {
     width: 775px;
     height: 400px;
 }
@@ -20,10 +20,11 @@
     border-radius: 15px;
     width: 775px;
     text-align: center;
-    background-color: rgba(102, 204, 255, 0.8);
+    background-color: rgba(102, 204, 255, 0.3);
     margin-left: 10px;
     color: #3a23aa;
     font-size: 1.15rem;
+    box-shadow: 10px -10px 8px lightgray;
 }
 
 .header-line {
