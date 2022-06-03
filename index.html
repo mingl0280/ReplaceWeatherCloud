@@ -1119,10 +1119,10 @@
                     }
                     this.option.visualMap[0].max = outdoor_max;
                     this.option.visualMap[0].min = outdoor_min;
-                    this.option.visualMap[0].text = [other_tooltip_translate[target_lang].temp_out + "\r\n" + outdoor_max.toString(), outdoor_min.toString()];
+                    this.option.visualMap[0].text = [generic_info_trns[target_lang].outdoor + "\r\n" + outdoor_max.toString(), outdoor_min.toString()];
                     this.option.visualMap[1].max = indoor_max;
                     this.option.visualMap[1].min = indoor_min;
-                    this.option.visualMap[1].text = [other_tooltip_translate[target_lang].temp_in + "\r\n" + indoor_max.toString(), indoor_min.toString()];
+                    this.option.visualMap[1].text = [generic_info_trns[target_lang].indoor + "\r\n" + indoor_max.toString(), indoor_min.toString()];
 
                     this.option.series[0].data = out_data;
                     this.option.series[1].data = out_data;
