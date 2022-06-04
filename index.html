@@ -382,7 +382,7 @@
     }
 
     var other_dims = {
-        time: 0, data_raw_item: 1,
+        time: 0, data_raw_item: 1, data_smoothed: 2,
     }
 
     var temp_dims = {
@@ -390,7 +390,7 @@
     }
 
     var baro_dims = {
-        time: 0, baro: 1
+        time: 0, baro: 1, raw_baro:2
     }
 
     var wind_angle_types = {
@@ -780,7 +780,7 @@
                         },
                         smooth: false,
                         data: [],
-                        z: 1
+                        z: 4
                     }, {
                         type: 'line',
                         symbol: 'none',
@@ -793,9 +793,39 @@
                         lineStyle: {
                             normal: {
                                 color: '#66ccff',
-                                type: 'dotted'
+                                type: 'solid'
+                            }
+                        }, z: 3
+                    }, {
+                        type: 'line',
+                        symbol: 'none',
+                        encode: {
+                            x: dims.time,
+                            y: dims.actual_speed
+                        },
+                        data: [],
+                        smooth: false,
+                        lineStyle: {
+                            normal: {
+                                color: '#ff9f63',
+                                type: 'dashed'
                             }
                         }, z: 2
+                    }, {
+                        type: 'line',
+                        symbol: 'none',
+                        encode: {
+                            x: dims.time,
+                            y: dims.gust
+                        },
+                        data: [],
+                        smooth: false,
+                        lineStyle: {
+                            normal: {
+                                color: '#ffcbaf',
+                                type: 'dashed'
+                            }
+                        }, z: 1
                     }]
                 }
             }
@@ -828,6 +858,8 @@
                     }
                     this.option.series[1].data = out_data;
                     this.option.series[2].data = out_data;
+                    this.option.series[3].data = out_data;
+                    this.option.series[4].data = out_data;
 
                     var btns = document.getElementsByClassName('wind_time_lst');
                     for (let i = 0; i < btns.length; i++) {
@@ -1045,7 +1077,7 @@
                         symbol: 'none',
                         lineStyle: {
                             normal: {
-                                type: 'dashed'
+                                type: 'dotted'
                             }
                         },
                         encode: {
@@ -1195,7 +1227,7 @@
                         symbol: 'none',
                         encode: {
                             x: other_dims.time,
-                            y: other_dims.data_raw_item
+                            y: other_dims.data_smoothed
                         },
                         lineStyle: {
                             normal: {
@@ -1205,7 +1237,23 @@
                         },
                         smooth: false,
                         data: [],
-                        z: 1
+                        z: 50
+                    }, {
+                        type: 'line',
+                        symbol: 'none',
+                        encode: {
+                            x: other_dims.time,
+                            y: other_dims.data_raw_item
+                        },
+                        lineStyle: {
+                            normal: {
+                                color: '#cbcbcb',
+                                type: 'solid'
+                            }
+                        },
+                        smooth: false,
+                        data: [],
+                        z: 49
                     }]
                 }
             }
@@ -1232,6 +1280,7 @@
                         out_data = result.data
                     })
                     this.option.series[0].data = out_data;
+                    this.option.series[1].data = out_data;
                 },
                 set_translate_objects(trans_name) {
                     this.option.title.text = other_tooltip_translate[trans_name].solar_title;
@@ -1257,7 +1306,9 @@
                                 echarts.format.formatTime('yyyy-MM-dd', params[0].value[baro_dims.time])
                                 + ' ' + echarts.format.formatTime('hh:mm', params[0].value[baro_dims.time]),
                                 other_tooltip_translate[cached_trn_name].barometer + ': ' +
-                                params[0].value[baro_dims.baro].toString() + 'hpa'
+                                params[0].value[baro_dims.baro].toString() + 'hpa',
+                                other_tooltip_translate[cached_trn_name].barometer + ': ' +
+                                params[0].value[baro_dims.raw_baro].toString() + 'hpa'
                             ].join('<br>');
                         }
                     },
@@ -1325,8 +1376,21 @@
                         },
                         smooth: true,
                         data: [],
-                        z: 1
-                    }],
+                        z: 5
+                    }, {
+                        type: 'line',
+                        symbol: 'none',
+                        encode: {
+                            x: baro_dims.time,
+                            y: baro_dims.raw_baro
+                        },
+                        lineStyle:{
+                            color: '#aaaaaa'
+                        },
+                        smooth: true,
+                        data: [],
+                        z: 1}
+                    ],
                     graphic:[
                         {
                             type: 'text',
@@ -1379,9 +1443,10 @@
                     this.option.visualMap[0].text = [other_tooltip_translate[target_lang].barometer + "\r\n" + baro_max.toString() + " hPa", baro_min.toString() + " hPa"];
 
                     this.option.series[0].data = out_data;
+                    this.option.series[1].data = out_data;
 
                     //this.option.series[0].markPoint.data[2].yAxis = out_data[out_data.length-1][baro_dims.baro];
-                    this.option.graphic[0].style.text = other_tooltip_translate[target_lang].current_baro + ": " + out_data[out_data.length - 1][baro_dims.baro] + " hPa";
+                    this.option.graphic[0].style.text = other_tooltip_translate[target_lang].current_baro + ": " + out_data[out_data.length - 1][baro_dims.raw_baro] + " hPa";
                     //this.option.series[1].data = out_data;
                     this.$forceUpdate()
 

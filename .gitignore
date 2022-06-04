@@ -7,3 +7,4 @@ pgdb.py
 *.old
 venv/
 .idea/
+libs/

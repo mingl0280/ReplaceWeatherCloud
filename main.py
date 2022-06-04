@@ -19,7 +19,7 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-
+import itertools
 import logging
 import math
 import shutil
@@ -29,6 +29,7 @@ from decimal import Decimal
 from os.path import exists
 from time import mktime
 from typing import Optional
+from collections import deque
 
 import psycopg
 import uvicorn
@@ -117,6 +118,38 @@ class KalmanFilter:
 
     def set_default_q(self):
         self.q = Decimal(0.075)
+
+
+def sliding_average(data, col_num, window_size, round_digits):
+    tmp_arr = []
+    index = 0
+    half_size = math.floor(window_size / 2)
+    for x in range(0, math.floor(window_size / 2)):
+        tmp_arr.append(data[0][col_num])
+
+    for item in data:
+        tmp_arr.append(item[col_num])
+        index += 1
+
+    for x in range(0, math.floor(window_size / 2)):
+        tmp_arr.append(data[-1][col_num])
+
+    dq = deque(tmp_arr[:window_size])
+
+    s = sum(dq)
+    arr_avg = []
+
+    for i in range(half_size, len(tmp_arr)):
+        s += tmp_arr[i] - dq.popleft()
+        dq.append(tmp_arr[i])
+        arr_avg.append(round(s / window_size, round_digits))
+
+    ret_data = data
+
+    for i in range(0, index-1):
+        ret_data[i][col_num] = arr_avg[i+half_size]
+
+    return ret_data
 
 
 class RoseMapDirItem:
@@ -211,11 +244,14 @@ async def get_solar(prior_days: Optional[int] = Query(None, alias="priorDays"),
         try:
             return_data.append([
                 item["Time"],
+                item["Solar"],
                 item["Solar"]
             ])
         except:
             db_conn.close()
             db_conn = psycopg.connect(cfg_items["database"]["connection_str"])
+
+    return_data = sliding_average(return_data, 2, 15, 1)
 
     return return_data
 
@@ -262,8 +298,8 @@ async def get_temp(prior_days: Optional[int] = Query(None, alias="priorDays"),
     return return_data
 
 
-@app.get("/api/barometer")
-async def get_baro(prior_days: Optional[int] = Query(None, alias="priorDays"),
+#@app.get("/api/raw_barometer")
+async def get_raw_baro(prior_days: Optional[int] = Query(None, alias="priorDays"),
                    prior_hrs: Optional[int] = Query(None, alias="priorHrs")):
     global db_conn
     where_str = get_interval_where_str(prior_days, prior_hrs)
@@ -271,13 +307,37 @@ async def get_baro(prior_days: Optional[int] = Query(None, alias="priorDays"),
                     " ORDER BY localdatetime DESC"
     result = db_conn.cursor().execute(sql_query_str)
     data = result.fetchall()
+
+    return data
+
+
+@app.get("/api/barometer")
+async def get_baro(prior_days: Optional[int] = Query(None, alias="priorDays"),
+                   prior_hrs: Optional[int] = Query(None, alias="priorHrs")):
+
+    data = await get_raw_baro(prior_days, prior_hrs)
+    if prior_days == 0 or prior_days is None:
+        prior_hrs = prior_hrs + 1
+        cut_count = 60
+    else:
+        prior_days = prior_days + 1
+        cut_count = 24 * 60
+
+    window_size = 30
+
     return_data = []
+    interm_data = []
+    qarray = []
+    index = 0
 
     for item in data:
-        return_data.append([
+        interm_data.append([
             item["Time"],
+            item["Baro"],
             item["Baro"]
         ])
+
+    return_data = sliding_average(interm_data, 1, 30, 3)
 
     return return_data
 
@@ -296,33 +356,40 @@ async def get_wind_by_time(prior_days: Optional[int] = Query(None, alias="priorD
 
     raw_more_data = await get_wind(prior_days, prior_hrs)
     raw_more_data = raw_more_data[:cut_count]
-    speed_filter = KalmanFilter()
-    gust_filter = KalmanFilter()
-    if (prior_days == 0 or prior_days is None) and prior_hrs <= 3:
-        speed_filter.set_q(Decimal(0.8))
-        gust_filter.set_q(Decimal(0.8))
-    else:
-        if (prior_days == 0 or prior_days is None) and 2 < prior_hrs < 10:
-            speed_filter.set_default_q()
-            gust_filter.set_default_q()
+    #speed_filter = KalmanFilter()
+    #gust_filter = KalmanFilter()
+    #if (prior_days == 0 or prior_days is None) and prior_hrs <= 3:
+    #    speed_filter.set_q(Decimal(0.8))
+    #    gust_filter.set_q(Decimal(0.8))
+    #else:
+    #    if (prior_days == 0 or prior_days is None) and 2 < prior_hrs < 10:
+    #        speed_filter.set_default_q()
+    #        gust_filter.set_default_q()
+    #
+    #    else:
+    #        speed_filter.set_q(Decimal(0.0001))
+    #        gust_filter.set_q(Decimal(0.0001))
 
-        else:
-            speed_filter.set_q(Decimal(0.0001))
-            gust_filter.set_q(Decimal(0.0001))
-
-    speed_filter.flush_data(raw_more_data, "Speed")
-    gust_filter.flush_data(raw_more_data, "Gust")
+    #speed_filter.flush_data(raw_more_data, "Speed")
+    #gust_filter.flush_data(raw_more_data, "Gust")
     for data_item in raw_data:
         data_remap.append([
             data_item["Time"],
-            round(speed_filter.calc_new_data(data_item["Speed"]) * Decimal(1.9438444924), 2),
+            round(data_item["Speed"] * Decimal(1.9438444924), 2),
             round((270 - data_item["Direction"]) * 3.141592654 / 180, 3),
             round(data_item["Gust"] * Decimal(1.9438444924), 2),
-            round(gust_filter.calc_new_data(data_item["Gust"]) * Decimal(1.9438444924), 2),
+            round(data_item["Gust"] * Decimal(1.9438444924), 2),
             round(data_item["Speed"] * Decimal(1.9438444924), 2),
+            # round(speed_filter.calc_new_data(data_item["Speed"]) * Decimal(1.9438444924), 2),
+            # round((270 - data_item["Direction"]) * 3.141592654 / 180, 3),
+            # round(data_item["Gust"] * Decimal(1.9438444924), 2),
+            # round(gust_filter.calc_new_data(data_item["Gust"]) * Decimal(1.9438444924), 2),
+            # round(data_item["Speed"] * Decimal(1.9438444924), 2),
             get_dir_from_angle(data_item["Direction"]),
             data_item["Direction"]
         ])
+    data_remap = sliding_average(data_remap, 1, 3, 2)
+    data_remap = sliding_average(data_remap, 4, 3, 2)
     return data_remap
 
 
