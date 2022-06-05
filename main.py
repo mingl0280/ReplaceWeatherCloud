@@ -313,33 +313,46 @@ async def get_raw_baro(prior_days: Optional[int] = Query(None, alias="priorDays"
 
 @app.get("/api/barometer")
 async def get_baro(prior_days: Optional[int] = Query(None, alias="priorDays"),
-                   prior_hrs: Optional[int] = Query(None, alias="priorHrs")):
+                   prior_hrs: Optional[int] = Query(None, alias="priorHrs"),
+                   altitude: Optional[int] = Query(None, alias="altitude")):
 
     data = await get_raw_baro(prior_days, prior_hrs)
-    if prior_days == 0 or prior_days is None:
-        prior_hrs = prior_hrs + 1
-        cut_count = 60
-    else:
-        prior_days = prior_days + 1
-        cut_count = 24 * 60
 
     window_size = 30
 
-    return_data = []
     interm_data = []
-    qarray = []
-    index = 0
+
+    fix_alt = False
+
+    if altitude is None or altitude == 0:
+        fix_alt = False
+    else:
+        fix_alt = True
 
     for item in data:
-        interm_data.append([
-            item["Time"],
-            item["Baro"],
-            item["Baro"]
-        ])
+        if fix_alt:
+            baro = altitude_fix(item["Baro"], altitude)
+            interm_data.append([
+                item["Time"],
+                baro,
+                baro
+            ])
+        else:
+            interm_data.append([
+                item["Time"],
+                item["Baro"],
+                item["Baro"]
+            ])
 
-    return_data = sliding_average(interm_data, 1, 30, 3)
+    return_data = sliding_average(interm_data, 1, window_size, 2)
 
     return return_data
+
+
+def altitude_fix(relative_pressure: Decimal, altitude: int):
+    approx_fix = Decimal(altitude) / Decimal(100) * Decimal(12)
+    abs_pressure = relative_pressure - approx_fix
+    return abs_pressure
 
 
 @app.get("/api/windByTime")
@@ -347,15 +360,26 @@ async def get_wind_by_time(prior_days: Optional[int] = Query(None, alias="priorD
                            prior_hrs: Optional[int] = Query(None, alias="priorHrs")):
     raw_data = await get_wind(prior_days, prior_hrs)
     data_remap = []
-    if prior_days == 0 or prior_days is None:
-        prior_hrs = prior_hrs + 1
-        cut_count = 60
+    window_size = 5
+    if (prior_days == 0 or prior_days is None) and prior_hrs <= 3:
+        window_size = 5
     else:
-        prior_days = prior_days + 1
-        cut_count = 24 * 60
-
-    raw_more_data = await get_wind(prior_days, prior_hrs)
-    raw_more_data = raw_more_data[:cut_count]
+        if (prior_days == 0 or prior_days is None) and 2 < prior_hrs < 10:
+            window_size = 15
+        else:
+            if prior_days > 2:
+                window_size = 240
+            else:
+                window_size = 30
+    # if prior_days == 0 or prior_days is None:
+    #     prior_hrs = prior_hrs + 1
+    #     cut_count = 60
+    # else:
+    #     prior_days = prior_days + 1
+    #     cut_count = 24 * 60
+    #
+    # raw_more_data = await get_wind(prior_days, prior_hrs)
+    # raw_more_data = raw_more_data[:cut_count]
     #speed_filter = KalmanFilter()
     #gust_filter = KalmanFilter()
     #if (prior_days == 0 or prior_days is None) and prior_hrs <= 3:
@@ -388,8 +412,8 @@ async def get_wind_by_time(prior_days: Optional[int] = Query(None, alias="priorD
             get_dir_from_angle(data_item["Direction"]),
             data_item["Direction"]
         ])
-    data_remap = sliding_average(data_remap, 1, 3, 2)
-    data_remap = sliding_average(data_remap, 4, 3, 2)
+    data_remap = sliding_average(data_remap, 1, window_size, 2)
+    data_remap = sliding_average(data_remap, 4, window_size, 2)
     return data_remap
 
 
@@ -450,8 +474,14 @@ async def say_hello(name: str):
 
 
 @app.get("/api/latest")
-async def latest_info():
+async def latest_info(altitude: Optional[int] = Query(None, alias="altitude")):
     check_db()
+    baro_abs_stmt = "weather_data.barometer as \"barometer_abs\""
+
+    if altitude is not None and altitude != 0:
+        fix_num = Decimal(altitude) / Decimal(100) * Decimal(12)
+        baro_abs_stmt = " round(weather_data.barometer - {},1)as \"barometer_abs\"".format(fix_num)
+
     sql_stmt = """SELECT
         to_char(weather_data.localdatetime, 'YYYY-MM-DD HH24:MI:SS') AS "Time", 
         weather_data.tempindoor, 
@@ -464,6 +494,7 @@ async def latest_info():
         weather_data.heatindex, 
         weather_data.temphumidwindindex, 
         weather_data.barometer, 
+        {},
         ROUND(weather_data.windspd*1.9438444924, 2) as "windspd", 
         ROUND(weather_data.highwindspd*1.9438444924, 2) as "highwindspd", 
         weather_data.winddirection, 
@@ -478,7 +509,7 @@ async def latest_info():
         weather_data
     ORDER BY
         weather_data.localdatetime DESC
-    LIMIT 1"""
+    LIMIT 1""".format(baro_abs_stmt)
 
     return db_conn.cursor().execute(sql_stmt).fetchone()
 

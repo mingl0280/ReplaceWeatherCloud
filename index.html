@@ -40,8 +40,19 @@
         </div>
     </form>
     <form class="card_piece">
-        <label for="TimeTypeSelect" class="form-label">Time Options</label>
+        <div id="altitude_input" class="form-row">
+            <div class="form-group" style="display: inline">
+                <label for="altitude_value_input">{{trns.altitude_text}}:</label>
+                <input type="number" class="form-control col-md-6" id="altitude_value_input" style="display: inline; width: 80%"
+                       v-bind:placeholder="trns.altitude_alt_text">
+                <button type="button" class="btn btn-success" onclick="UpdateAltitude()" style="display: inline">{{trns.set_text}}
+                </button>
+            </div>
+        </div>
+    </form>
+    <form class="card_piece">
         <div id="TimeTypeSelect">
+            <label for="TimeTypeSelect" class="form-label">{{trns.time_opt_text}}</label>
             <button type="button" class="btn btn-outline-primary time_lst" onclick="UpdateRoseMap(0, 0, this)">
                 {{trns.all}}
             </button>
@@ -95,7 +106,9 @@
                 <td><span>{{trns.dew_point}}: </span>
                     <span class="data_item">{{disp_data.dewindoor}}</span>℃ / <span class="data_item">{{disp_data.dewoutdoor}}</span>℃
                 </td>
-                <td><span>{{trns.pressure}}: </span><span class="data_item">{{disp_data.barometer}}</span> hPa</td>
+                <td><span>{{trns.pressure}}: </span><span class="data_item">{{disp_data.barometer}}</span> / <span
+                        class="data_item">{{disp_data.barometer_abs}}</span> hPa
+                </td>
             </tr>
             <tr>
                 <td><span>{{trns.wind.normal}}: </span>{{trns.wind.gust}} <span class="data_item">{{disp_data.highwindspd}}</span>
@@ -123,14 +136,16 @@
         </table>
     </div>
     <form class="card_piece">
-        <label for="WindTimeSelect" class="form-label">Time Options</label>
         <div id="WindTimeSelect">
+            <label for="WindTimeSelect" class="form-label">{{trns.time_opt_text}}</label>
             <button type="button" class="btn btn-outline-primary active wind_time_lst"
-                    onclick="updateWind(0, 1, this)">
-                1
+                    onclick="updateWind(0, 1, this)">1
                 {{trns.hr}}
             </button>
             <button type="button" class="btn btn-outline-primary wind_time_lst" onclick="updateWind(0, 2, this)">2
+                {{trns.hrs}}
+            </button>
+            <button type="button" class="btn btn-outline-primary wind_time_lst" onclick="updateWind(0, 4, this)">4
                 {{trns.hrs}}
             </button>
             <button type="button" class="btn btn-outline-primary wind_time_lst" onclick="updateWind(1, 0, this)">1
@@ -205,7 +220,8 @@
      * ================================ */
 
     var cached_current_btn, cached_days, cached_hours,
-        cached_wind_days = 0, cached_wind_hours = 1, cached_wind_btn
+        cached_wind_days = 0, cached_wind_hours = 1, cached_wind_btn,
+        cached_altitude = 0
 
     ;
 
@@ -330,6 +346,10 @@
             uvindex: "UV Index",
             hour: "hr",
             knots: "kn",
+            altitude_alt_text: "Altitude in meters, e.g. 1002",
+            altitude_text: "Altitude",
+            set_text: "Set",
+            time_opt_text: "Time Options",
         },
         "zhs": {
             feels_like: "体感温度",
@@ -356,6 +376,10 @@
             uvindex: "紫外线指数",
             hour: "小时",
             knots: "节",
+            altitude_alt_text: "海拔高度，例如1002",
+            altitude_text: "海拔",
+            set_text: "设置",
+            time_opt_text: "时间选项",
         }
 
     }
@@ -469,6 +493,7 @@
             barometer: "Barometer",
             barometer_title: "Barometer History",
             current_baro: "Current air pressure",
+            barometer_avg: "30-min moving average",
         },
         "zhs": {
             mmhr: "毫米/小时",
@@ -483,6 +508,7 @@
             barometer: "气压",
             barometer_title: "气压表",
             current_baro: "当前气压",
+            barometer_avg: "30分钟平均气压",
 
         }
     }
@@ -515,6 +541,7 @@
             })
         };
     }
+
 
     /* ================================
      *       Vue.js Templates
@@ -646,6 +673,7 @@
                 "dewindoor": 0.0, "dewoutdoor": 0.0,
                 "WindChill": 0.0, "heatindex": 0.0,
                 "temphumidwindindex": 0.0, "barometer": 0.0,
+                "barometer_abs": 0.0,
                 "windspd": 0.0, "highwindspd": 0.0,
                 "winddirection": 0, "avgwindspd": 0.0, "avgwinddir": 0.0,
                 "rainrate": 0.0, "raindaily": 0.0, "solarrad": 0.0,
@@ -655,10 +683,20 @@
         },
         methods: {
             async fetch_info() {
+                let altitude = localStorage.getItem('altitude')
+                let optional_altitude = "";
+                if (altitude != "null" && altitude != null && altitude != NaN && altitude != 0) {
+                    optional_altitude = "altitude=" + altitude;
+                }
                 var data_out = {
                     data: {}
                 };
-                await axios.get("/api/latest").then(function (result) {
+                let query = "/api/latest"
+                if (optional_altitude != ""){
+                    query += "?" + optional_altitude;
+                }
+
+                await axios.get(query).then(function (result) {
                     data_out.data = result.data;
                 })
                 this.disp_data = data_out.data;
@@ -703,7 +741,7 @@
                     grid: {
                         top: 40,
                         bottom: 60,
-                        right:0
+                        right:10
                     },
                     xAxis: {
                         type: 'time'
@@ -778,7 +816,7 @@
                                 type: 'solid'
                             }
                         },
-                        smooth: false,
+                        smooth: true,
                         data: [],
                         z: 4
                     }, {
@@ -789,7 +827,7 @@
                             y: dims.gust_filtered
                         },
                         data: [],
-                        smooth: false,
+                        smooth: true,
                         lineStyle: {
                             normal: {
                                 color: '#66ccff',
@@ -1305,10 +1343,10 @@
                             return [
                                 echarts.format.formatTime('yyyy-MM-dd', params[0].value[baro_dims.time])
                                 + ' ' + echarts.format.formatTime('hh:mm', params[0].value[baro_dims.time]),
+                                other_tooltip_translate[cached_trn_name].barometer_avg + ': ' +
+                                params[0].value[baro_dims.baro].toString() + ' hpa',
                                 other_tooltip_translate[cached_trn_name].barometer + ': ' +
-                                params[0].value[baro_dims.baro].toString() + 'hpa',
-                                other_tooltip_translate[cached_trn_name].barometer + ': ' +
-                                params[0].value[baro_dims.raw_baro].toString() + 'hpa'
+                                params[0].value[baro_dims.raw_baro].toString() + ' hpa'
                             ].join('<br>');
                         }
                     },
@@ -1320,9 +1358,9 @@
                         type: 'time'
                     },
                     yAxis: [{
-                        name: 'Value',
+                        name: 'hPa',
                         nameLocation: 'middle',
-                        nameGap: 35,
+                        nameGap: 55,
                         axisLine: {
                             lineStyle: {
                                 color: '#666'
@@ -1346,8 +1384,8 @@
                         left: 'right',
                         top: 'top',
                         orient: 'vertical',
-                        itemWidth: 55,
-                        itemHeight: 100,
+                        itemWidth: 30,
+                        itemHeight: 300,
                         text: [],
                         min: 0,
                         max: 30,
@@ -1422,10 +1460,17 @@
                     }
                     if (hours != 0) {
                         opts[index] = "priorHrs=" + hours.toString()
+                        index++;
                     }
                     if (hours == 0 && days == 0) {
                         opts[index] = "priorHrs=1"
+                        index++;
                     }
+                    var altitude = localStorage.getItem('altitude')
+                    if (altitude != "null" && altitude != null){
+                        opts[index] = "altitude=" + altitude;
+                    }
+
                     var args = opts.join("&");
 
                     await axios.get("/api/barometer?" + args).then(function (result) {
@@ -1446,7 +1491,7 @@
                     this.option.series[1].data = out_data;
 
                     //this.option.series[0].markPoint.data[2].yAxis = out_data[out_data.length-1][baro_dims.baro];
-                    this.option.graphic[0].style.text = other_tooltip_translate[target_lang].current_baro + ": " + out_data[out_data.length - 1][baro_dims.raw_baro] + " hPa";
+                    this.option.graphic[0].style.text = other_tooltip_translate[target_lang].current_baro + ": " + out_data[0][baro_dims.raw_baro] + " hPa";
                     //this.option.series[1].data = out_data;
                     this.$forceUpdate()
 
@@ -1458,6 +1503,12 @@
             }
     })
 
+    var alt_label_obj = new Vue({
+        el: "#altitude_input",
+        data: {
+            trns: {}
+        }
+    })
 
     /* ================================
      *       Update Functions
@@ -1490,6 +1541,7 @@
         other_label_obj.trns = time_label_trns[target_lang];
         TempPict.set_translate_objects(target_lang);
         SolarPict.set_translate_objects(target_lang);
+        alt_label_obj.trns = generic_info_trns[target_lang];
     }
 
     function ReadLang() {
@@ -1517,6 +1569,7 @@
         TempPict.set_translate_objects(target_lang);
         SolarPict.set_translate_objects(target_lang);
         BaroPict.set_translate_objects(target_lang);
+        alt_label_obj.trns = generic_info_trns[target_lang];
     }
 
     function UpdateRoseMap(days, hours, elem) {
@@ -1574,6 +1627,19 @@
         update_others(other_days, other_hours, other_btn);
     }
 
+    function UpdateAltitude(){
+        let altitude = Number(document.getElementById('altitude_value_input').value);
+        localStorage.setItem('altitude', altitude.toString());
+    }
+
+    function ReadAlt() {
+        let altitude = localStorage.getItem('altitude');
+        if (altitude != "null" && altitude != null && altitude != NaN) {
+            document.getElementById('altitude_value_input').value = altitude;
+        }
+    }
+
+    ReadAlt();
 
     /* ================================
      *       Timers
