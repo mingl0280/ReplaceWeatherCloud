@@ -87,3 +87,17 @@ table tr td:nth-child(2) {
     margin-left: 15px;
     text-align: left;
 }
+
+.inline-inputs{
+    display: inline;
+    width: 80%;
+}
+
+.inline-inputs-less{
+    display: inline;
+    width: 72%;
+}
+
+.vert-align-middle{
+    vertical-align: middle;
+}

@@ -22,6 +22,7 @@ def create_db():
         cursor.execute("""
                 create table weather_data
             (
+                index_id           bigserial      not null primary key,
                 localdatetime      timestamp(0)   not null,
                 tempindoor         numeric(8, 2)  not null,
                 humindoor          integer        not null,
@@ -48,9 +49,13 @@ def create_db():
             
             alter table weather_data
                 owner to postgres;
+            CREATE INDEX "idx_ldt" ON "public"."weather_data" USING btree (
+            "localdatetime");
+            CREATE INDEX "idx_id" ON "public"."weather_data" USING btree (
+            "index_id");
             
             grant delete, insert, references, select, trigger, truncate, update on weather_data to weatherman;
-            
+            grant ALL PRIVILEGES on ALL SEQUENCES IN SCHEMA public TO weatherman;
             """)
     except:
         print("DB Operation failed!")

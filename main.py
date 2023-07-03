@@ -25,6 +25,7 @@ import math
 import shutil
 import time
 from datetime import datetime as dt
+from datetime import timedelta
 from decimal import Decimal
 from os.path import exists
 from time import mktime
@@ -50,6 +51,7 @@ else:
         cfg_items = yaml.load(yaml_content)
 
 db_conn = psycopg.connect(cfg_items["database"]["connection_str"], row_factory=dict_row)
+db_conn.prepare_threshold = 0
 
 app = FastAPI()
 
@@ -60,7 +62,12 @@ def check_db():
     global db_conn
     if db_conn.broken:
         db_conn.close()
-        db_conn = psycopg.connect(cfg_items["database"]["connection_str"])
+        db_conn = psycopg.connect(cfg_items["database"]["connection_str"], row_factory=dict_row)
+        db_conn.prepare_threshold = 0
+
+    if db_conn.closed:
+        db_conn = psycopg.connect(cfg_items["database"]["connection_str"], row_factory=dict_row)
+        db_conn.prepare_threshold = 0
 
 
 legendName = [
@@ -83,6 +90,11 @@ legendName = [
 @app.get("/")
 async def root():
     return FileResponse('index.html')
+
+
+@app.get("/detaildata.html")
+async def detail_response():
+    return FileResponse('detaildata.html')
 
 
 @app.get("/favicon.ico")
@@ -146,8 +158,8 @@ def sliding_average(data, col_num, window_size, round_digits):
 
     ret_data = data
 
-    for i in range(0, index-1):
-        ret_data[i][col_num] = arr_avg[i+half_size]
+    for i in range(0, index - 1):
+        ret_data[i][col_num] = arr_avg[i + half_size]
 
     return ret_data
 
@@ -213,6 +225,29 @@ def get_interval_where_str(prior_days, prior_hrs):
     return where_str
 
 
+def process_wind_data(raw_data, window_size: int):
+    data_remap = []
+    for data_item in raw_data:
+        data_remap.append([
+            data_item["Time"],
+            round(data_item["Speed"] * Decimal(1.9438444924), 2),
+            round((270 - data_item["Direction"]) * 3.141592654 / 180, 3),
+            round(data_item["Gust"] * Decimal(1.9438444924), 2),
+            round(data_item["Gust"] * Decimal(1.9438444924), 2),
+            round(data_item["Speed"] * Decimal(1.9438444924), 2),
+            # round(speed_filter.calc_new_data(data_item["Speed"]) * Decimal(1.9438444924), 2),
+            # round((270 - data_item["Direction"]) * 3.141592654 / 180, 3),
+            # round(data_item["Gust"] * Decimal(1.9438444924), 2),
+            # round(gust_filter.calc_new_data(data_item["Gust"]) * Decimal(1.9438444924), 2),
+            # round(data_item["Speed"] * Decimal(1.9438444924), 2),
+            get_dir_from_angle(data_item["Direction"]),
+            data_item["Direction"]
+        ])
+    data_remap = sliding_average(data_remap, 1, window_size, 2)
+    data_remap = sliding_average(data_remap, 4, window_size, 2)
+    return data_remap
+
+
 @app.get("/api/wind")
 async def get_wind(prior_days: Optional[int] = Query(None, alias="priorDays"),
                    prior_hrs: Optional[int] = Query(None, alias="priorHrs")):
@@ -221,10 +256,30 @@ async def get_wind(prior_days: Optional[int] = Query(None, alias="priorDays"),
     where_str = get_interval_where_str(prior_days, prior_hrs)
 
     sql_query_str = \
+        "SELECT localdatetime as \"Time\", windspd AS \"Speed\", highwindspd AS \"Gust\", winddirection AS \"Direction\" FROM weather_data " + where_str + " ORDER BY localdatetime DESC"
+    result = db_conn.cursor().execute(sql_query_str)
+
+    return result.fetchall()
+
+
+async def timed_get_raw_wind(start_timestamp: str = Query(None, alias="startTime"),
+                             end_timestamp: str = Query(None, alias="endTime")):
+    global db_conn
+    check_db()
+    sql_query_str = \
         "SELECT localdatetime AS \"Time\", " \
         " windspd AS \"Speed\", highwindspd AS \"Gust\", " \
-        " winddirection as \"Direction\" FROM weather_data " + where_str + " ORDER BY localdatetime DESC"
-    result = db_conn.cursor().execute(sql_query_str)
+        " winddirection as \"Direction\" FROM weather_data " \
+        "WHERE localdatetime between (%(sttms)s) and (%(edtms)s) " \
+        "ORDER BY localdatetime DESC"
+    try:
+        result = db_conn.cursor().execute(sql_query_str, {
+            "sttms": start_timestamp,
+            "edtms": end_timestamp
+        }, prepare=True)
+    except Exception as e:
+        db_conn.close()
+        return str(e)
 
     return result.fetchall()
 
@@ -235,7 +290,7 @@ async def get_solar(prior_days: Optional[int] = Query(None, alias="priorDays"),
     global db_conn
     check_db()
     where_str = get_interval_where_str(prior_days, prior_hrs)
-    sql_query_str = "SELECT localdatetime AS \"Time\", solarrad as \"Solar\" FROM weather_data " + where_str + \
+    sql_query_str = "SELECT localdatetime AS \"Time\", solarrad as \"Solar\", index_id FROM weather_data " + where_str + \
                     " ORDER BY localdatetime DESC"
     result = db_conn.cursor().execute(sql_query_str)
     data = result.fetchall()
@@ -271,9 +326,11 @@ async def get_rain(prior_days: Optional[int] = Query(None, alias="priorDays"),
     for item in data:
         return_data.append([
             item["Time"],
+            item["Rain"],
             item["Rain"]
         ])
 
+    return_data = sliding_average(return_data, 2, 60, 2)
     return return_data
 
 
@@ -282,7 +339,8 @@ async def get_temp(prior_days: Optional[int] = Query(None, alias="priorDays"),
                    prior_hrs: Optional[int] = Query(None, alias="priorHrs")):
     global db_conn
     where_str = get_interval_where_str(prior_days, prior_hrs)
-    sql_query_str = "SELECT localdatetime AS \"Time\", tempoutdoor as \"TempOut\", tempindoor as \"TempIn\" FROM weather_data " + where_str + \
+    sql_query_str = "SELECT localdatetime AS \"Time\", tempoutdoor as \"TempOut\", " \
+                    "tempindoor as \"TempIn\" FROM weather_data " + where_str + \
                     " ORDER BY localdatetime DESC"
     result = db_conn.cursor().execute(sql_query_str)
     data = result.fetchall()
@@ -298,12 +356,12 @@ async def get_temp(prior_days: Optional[int] = Query(None, alias="priorDays"),
     return return_data
 
 
-#@app.get("/api/raw_barometer")
+# @app.get("/api/raw_barometer")
 async def get_raw_baro(prior_days: Optional[int] = Query(None, alias="priorDays"),
-                   prior_hrs: Optional[int] = Query(None, alias="priorHrs")):
+                       prior_hrs: Optional[int] = Query(None, alias="priorHrs")):
     global db_conn
     where_str = get_interval_where_str(prior_days, prior_hrs)
-    sql_query_str = "SELECT localdatetime AS \"Time\", barometer as \"Baro\" FROM weather_data " + where_str + \
+    sql_query_str = "SELECT localdatetime AS \"Time\", barometer as \"Baro\", index_id FROM weather_data " + where_str + \
                     " ORDER BY localdatetime DESC"
     result = db_conn.cursor().execute(sql_query_str)
     data = result.fetchall()
@@ -315,7 +373,6 @@ async def get_raw_baro(prior_days: Optional[int] = Query(None, alias="priorDays"
 async def get_baro(prior_days: Optional[int] = Query(None, alias="priorDays"),
                    prior_hrs: Optional[int] = Query(None, alias="priorHrs"),
                    altitude: Optional[int] = Query(None, alias="altitude")):
-
     data = await get_raw_baro(prior_days, prior_hrs)
 
     window_size = 30
@@ -359,10 +416,9 @@ def altitude_fix(relative_pressure: Decimal, altitude: int):
 async def get_wind_by_time(prior_days: Optional[int] = Query(None, alias="priorDays"),
                            prior_hrs: Optional[int] = Query(None, alias="priorHrs")):
     raw_data = await get_wind(prior_days, prior_hrs)
-    data_remap = []
     window_size = 5
     if (prior_days == 0 or prior_days is None) and prior_hrs <= 3:
-        window_size = 5
+        pass
     else:
         if (prior_days == 0 or prior_days is None) and 2 < prior_hrs < 10:
             window_size = 15
@@ -380,12 +436,12 @@ async def get_wind_by_time(prior_days: Optional[int] = Query(None, alias="priorD
     #
     # raw_more_data = await get_wind(prior_days, prior_hrs)
     # raw_more_data = raw_more_data[:cut_count]
-    #speed_filter = KalmanFilter()
-    #gust_filter = KalmanFilter()
-    #if (prior_days == 0 or prior_days is None) and prior_hrs <= 3:
+    # speed_filter = KalmanFilter()
+    # gust_filter = KalmanFilter()
+    # if (prior_days == 0 or prior_days is None) and prior_hrs <= 3:
     #    speed_filter.set_q(Decimal(0.8))
     #    gust_filter.set_q(Decimal(0.8))
-    #else:
+    # else:
     #    if (prior_days == 0 or prior_days is None) and 2 < prior_hrs < 10:
     #        speed_filter.set_default_q()
     #        gust_filter.set_default_q()
@@ -394,34 +450,12 @@ async def get_wind_by_time(prior_days: Optional[int] = Query(None, alias="priorD
     #        speed_filter.set_q(Decimal(0.0001))
     #        gust_filter.set_q(Decimal(0.0001))
 
-    #speed_filter.flush_data(raw_more_data, "Speed")
-    #gust_filter.flush_data(raw_more_data, "Gust")
-    for data_item in raw_data:
-        data_remap.append([
-            data_item["Time"],
-            round(data_item["Speed"] * Decimal(1.9438444924), 2),
-            round((270 - data_item["Direction"]) * 3.141592654 / 180, 3),
-            round(data_item["Gust"] * Decimal(1.9438444924), 2),
-            round(data_item["Gust"] * Decimal(1.9438444924), 2),
-            round(data_item["Speed"] * Decimal(1.9438444924), 2),
-            # round(speed_filter.calc_new_data(data_item["Speed"]) * Decimal(1.9438444924), 2),
-            # round((270 - data_item["Direction"]) * 3.141592654 / 180, 3),
-            # round(data_item["Gust"] * Decimal(1.9438444924), 2),
-            # round(gust_filter.calc_new_data(data_item["Gust"]) * Decimal(1.9438444924), 2),
-            # round(data_item["Speed"] * Decimal(1.9438444924), 2),
-            get_dir_from_angle(data_item["Direction"]),
-            data_item["Direction"]
-        ])
-    data_remap = sliding_average(data_remap, 1, window_size, 2)
-    data_remap = sliding_average(data_remap, 4, window_size, 2)
-    return data_remap
+    # speed_filter.flush_data(raw_more_data, "Speed")
+    # gust_filter.flush_data(raw_more_data, "Gust")
+    return process_wind_data(raw_data, window_size)
 
 
-@app.get("/api/wind/rosemap")
-async def get_rosemap_item(speed_type: Optional[int] = Query(0, alias="SpeedType"),
-                           prior_days: Optional[int] = Query(None, alias="priorDays"),
-                           prior_hrs: Optional[int] = Query(None, alias="priorHrs")):
-    raw_data = await get_wind(prior_days, prior_hrs)
+def process_rose_map(raw_data, speed_type):
     map_spd_categories = []
     real_spd_type_str = "Speed" if speed_type == 0 else "Gust"
     for serial_name in legendName:
@@ -466,6 +500,13 @@ async def get_rosemap_item(speed_type: Optional[int] = Query(0, alias="SpeedType
             map_spd_categories[12].data[data_dir_idx] += 1
 
     return map_spd_categories
+
+@app.get("/api/wind/rosemap")
+async def get_rosemap_item(speed_type: Optional[int] = Query(0, alias="SpeedType"),
+                           prior_days: Optional[int] = Query(None, alias="priorDays"),
+                           prior_hrs: Optional[int] = Query(None, alias="priorHrs")):
+    raw_data = await get_wind(prior_days, prior_hrs)
+    return process_rose_map(raw_data, speed_type)
 
 
 @app.get("/hello/{name}")
@@ -512,6 +553,42 @@ async def latest_info(altitude: Optional[int] = Query(None, alias="altitude")):
     LIMIT 1""".format(baro_abs_stmt)
 
     return db_conn.cursor().execute(sql_stmt).fetchone()
+
+
+def make_times_limited(start_timestamp, end_timestamp):
+    start_time_obj = dt.strptime(start_timestamp, '%Y-%m-%d %H:%M:%S')
+    end_time_obj = dt.strptime(end_timestamp, '%Y-%m-%d %H:%M:%S')
+    time_diff = end_time_obj - start_time_obj
+    if time_diff > timedelta(hours=48):
+        end_time_obj = start_time_obj + timedelta(hours=48)
+        end_timestamp = end_time_obj.strftime('%Y-%m-%d %H:%M:%S')
+
+    return start_timestamp, end_timestamp
+
+
+@app.get("/api/ByTime/wind")
+async def get_timed_wind(start_timestamp: str = Query(None, alias="startTime"),
+                         end_timestamp: str = Query(None, alias="endTime")):
+    if start_timestamp is None or end_timestamp is None:
+        return {"error": "startTime is None or endTime is None", "code": 500}
+
+    start_timestamp, end_timestamp = make_times_limited(start_timestamp, end_timestamp)
+
+    raw_data = await timed_get_raw_wind(start_timestamp, end_timestamp)
+    window_size = 5
+    return process_wind_data(raw_data, window_size)
+
+
+@app.get("/api/ByTime/wind/rosemap")
+async def get_timed_rosemap(speed_type: Optional[int] = Query(0, alias="SpeedType"),
+                            start_timestamp: str = Query(None, alias="startTime"),
+                            end_timestamp: str = Query(None, alias="endTime")):
+    if start_timestamp is None or end_timestamp is None:
+        return {"error": "startTime is None or endTime is None", "code": 500}
+
+    start_timestamp, end_timestamp = make_times_limited(start_timestamp, end_timestamp)
+    raw_data = await timed_get_raw_wind(start_timestamp, end_timestamp)
+    return process_rose_map(raw_data, speed_type)
 
 
 @app.get("/v01/set")
@@ -584,7 +661,9 @@ async def set_api(wid: str, key: str, tempin: int, humin: int,
         })
         print(result)
         db_conn.commit()
-    except:
+    except Exception as ex:
+        print(str(ex))
+        db_conn.close()
         return 500
 
     return 200

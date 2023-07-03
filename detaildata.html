@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WeatherReport</title>
+    <title>WeatherDataDetails</title>
     <!-- vue.js display library -->
     <script src="/static/js/vue.js"></script>
     <!-- composition-api library -->
@@ -17,8 +17,11 @@
     <script src="/static/js/bootstrap.js"></script>
     <!-- Save a file to local library -->
     <script src="/static/js/FileSaver.js"></script>
+    <!-- Moment.js -->
+    <script src="/static/js/moment.js"></script>
     <!-- bootstrap 3 style sheet -->
     <link href="/static/css/bootstrap.css" rel="stylesheet">
+
     <!-- Fonts
     Warning: Fonts are for personal use only!
      -->
@@ -39,13 +42,14 @@
             </button>
         </div>
     </form>
-    <a id="time-data-page-link" href="detaildata.html">{{trns.time_span_page_text}}</a>
+    <a id="time-data-page-link" href="/">{{trns.main_text}}</a>
     <form class="card_piece">
         <div id="altitude_input" class="form-row">
             <div class="form-group" style="display: inline">
-                <label for="altitude_value_input" class="vert-align-middle" style="min-width: 7.165em;">{{trns.altitude_text}}:</label>
-                <input type="number" class="form-control col-md-6 inline-inputs-less vert-align-middle" id="altitude_value_input"
-                       v-bind:placeholder="trns.altitude_alt_text">
+                <label for="altitude_value_input" class="vert-align-middle"
+                       style="min-width: 7.165em;">{{trns.altitude_text}}:</label>
+                <input type="number" class="form-control col-md-6 vert-align-middle inline-inputs-less"
+                       id="altitude_value_input" v-bind:placeholder="trns.altitude_alt_text" />
                 <button type="button" class="btn btn-success vert-align-middle" onclick="UpdateAltitude()"
                         style="display: inline;">{{trns.set_text}}
                 </button>
@@ -53,167 +57,28 @@
         </div>
     </form>
     <form class="card_piece">
-        <div id="TimeTypeSelect">
-            <label for="TimeTypeSelect" class="form-label">{{trns.time_opt_text}}</label>
-            <button type="button" class="btn btn-outline-primary time_lst" onclick="UpdateRoseMap(0, 0, this)">
-                {{trns.all}}
-            </button>
-            <button type="button" class="btn btn-outline-primary time_lst" onclick="UpdateRoseMap(0, 4, this)">4
-                {{trns.hrs}}
-            </button>
-            <button id="default_wind_rose" type="button" class="btn btn-outline-primary active time_lst"
-                    onclick="UpdateRoseMap(1, 0, this)">1 {{trns.day}}
-            </button>
-            <button type="button" class="btn btn-outline-primary time_lst" onclick="UpdateRoseMap(7, 0, this)">7
-                {{trns.days}}
-            </button>
-            <button type="button" class="btn btn-outline-primary time_lst" onclick="UpdateRoseMap(30, 0, this)">30
-                {{trns.days}}
-            </button>
+        <div id="time_selection_overall">
+            <div class="form-group" style="display: inline">
+                <label for="start_date_time">{{trns.start_date_time_alt_text}}:</label>
+                <input type="datetime-local" class="form-control col-md-3 inline-inputs" id="start_date_time"
+                       v-model="start_date_time" @change="checkdate()" >
+                <label style="color: red">{{start_datetime_err_msg}}</label>
+                <br />
+                <label for="end_date_time">{{trns.end_date_time_alt_text}}:</label>
+                <input type="datetime-local" class="form-control col-md-3 inline-inputs" id="end_date_time"
+                       v-model="end_date_time"  @change="checkdate()">
+                <label style="color: red">{{end_datetime_err_msg}}</label>
+            </div>
         </div>
     </form>
-
     <div id="WindRose">
         <v-chart autoresize :option="option"/>
     </div>
-
-    <div class="panel panel-default align-content-center" id="generic_info">
-        <div id="CurrentStat" class="panel-body header-line">
-            <div class="flex-md-fill align-content-center">
-                <h2 class="flex-row big-temp-disp">
-                    <span v-if="disp_data.tempoutdoor <= 4.4">{{disp_data.WindChill}}</span>
-                    <!--span v-if="disp_data.tempoutdoor > 4.4">{{disp_data.temphumidwindindex}}</span-->
-                    <span v-if="disp_data.tempoutdoor > 4.4 && disp_data.tempoutdoor <= 26.6">{{disp_data.temphumidwindindex}}</span>
-                    <span v-if="disp_data.tempoutdoor >26.6">{{disp_data.heatindex}}</span>
-                    ℃</h2>
-                <small class="flex-row">{{trns.feels_like}}</small>
-                <div class="feel-temp-comment">
-                    <span v-if="disp_data.tempoutdoor <= 4.4">{{trns.tag_text_wind_chill}}</span>
-                    <!--span v-if="disp_data.tempoutdoor > 4.4">{{trns.tag_text_thwindex}}</span-->
-                    <span v-if="disp_data.tempoutdoor > 4.4 && disp_data.tempoutdoor <=26.6">{{trns.tag_text_thwindex}}</span>
-                    <span v-if="disp_data.tempoutdoor >26.6">{{trns.tag_text_heat_idx}}</span>
-                </div>
-            </div>
-            <div class="flex-md-fill reported">
-                {{trns.report_created}}: <span class="data_item">{{disp_data.Time}}</span>
-            </div>
-        </div>
-        <table class="stat-table">
-            <tr>
-                <td><span>{{trns.indoor}}: </span>
-                    <span class="data_item">{{disp_data.tempindoor}}</span>℃ / <span class="data_item">{{disp_data.humindoor}}</span>%
-                </td>
-                <td><span>{{trns.outdoor}}: </span><span class="data_item">{{disp_data.tempoutdoor}}</span>℃ / <span
-                        class="data_item">{{disp_data.humoutdoor}}</span>%
-                </td>
-            </tr>
-            <tr>
-                <td><span>{{trns.dew_point}}: </span>
-                    <span class="data_item">{{disp_data.dewindoor}}</span>℃ / <span class="data_item">{{disp_data.dewoutdoor}}</span>℃
-                </td>
-                <td><span>{{trns.pressure}}: </span><span class="data_item">{{disp_data.barometer}}</span> / <span
-                        class="data_item">{{disp_data.barometer_abs}}</span> hPa
-                </td>
-            </tr>
-            <tr>
-                <td><span>{{trns.wind.normal}}: </span>{{trns.wind.gust}} <span class="data_item">{{disp_data.highwindspd}}</span>
-                    {{trns.knots}}&nbsp;
-                    {{trns.wind.average}}&nbsp;<span class="data_item">{{disp_data.windspd}}</span>&nbsp;{{trns.knots}}
-                </td>
-                <td><span>{{trns.wind.from}}&nbsp;</span><span class="data_item">{{disp_data.winddirection}}</span>°
-                </td>
-            </tr>
-            <tr>
-                <td>
-                    <span>{{trns.heat}}: </span>
-                    <span class="data_item">{{disp_data.heat}}℃</span>
-                    <span v-if="disp_data.heat > 26">&nbsp;&nbsp;{{trns.heat_idx}}: </span>
-                    <span class="data_item" v-if="disp_data.heat > 26">{{disp_data.heatindex}}℃</span>
-                </td>
-                <td>
-                    <span>{{trns.thwindex}}</span>
-                    <span class="data_item">{{disp_data.temphumidwindindex}}℃</span>
-                    <span v-if="disp_data.heat < 8">&nbsp;&nbsp;{{trns.tag_text_wind_chill}}: </span>
-                    <span class="data_item" v-if="disp_data.heat < 8">{{disp_data.WindChill}}℃</span></td>
-            </tr>
-            <tr v-if="disp_data.raindaily > 0">
-                <td><span>{{trns.rain}}: </span><span class="data_item">{{disp_data.rainrate}}</span>
-                    mm/{{trns.hour}}
-                </td>
-                <td><span>{{trns.rain_24h}}: </span><span class="data_item">{{disp_data.raindaily}}</span> mm</td>
-            </tr>
-            <tr v-if="disp_data.raindaily <= 0">
-                <td><span>{{trns.no_rain}}</span></td>
-                <td><span>{{trns.no_rain}}</span></td>
-            </tr>
-            <tr>
-                <td><span>{{trns.solar}}: </span><span class="data_item">{{disp_data.solarrad}}</span> W/㎡</td>
-                <td><span>{{trns.uvindex}}: </span><span class="data_item">{{disp_data.uvindex}}</span></td>
-            </tr>
-
-        </table>
-    </div>
-    <form class="card_piece">
-        <div id="WindTimeSelect">
-            <label for="WindTimeSelect" class="form-label">{{trns.time_opt_text}}</label>
-            <button type="button" class="btn btn-outline-primary active wind_time_lst"
-                    onclick="updateWind(0, 1, this)">1
-                {{trns.hr}}
-            </button>
-            <button type="button" class="btn btn-outline-primary wind_time_lst" onclick="updateWind(0, 2, this)">2
-                {{trns.hrs}}
-            </button>
-            <button type="button" class="btn btn-outline-primary wind_time_lst" onclick="updateWind(0, 4, this)">4
-                {{trns.hrs}}
-            </button>
-            <button type="button" class="btn btn-outline-primary wind_time_lst" onclick="updateWind(1, 0, this)">1
-                {{trns.day}}
-            </button>
-            <button type="button" class="btn btn-outline-primary wind_time_lst" onclick="updateWind(5, 0, this)">5
-                {{trns.days}}
-            </button>
-        </div>
-    </form>
     <br/>
     <div id="WindPict">
         <v-chart autoresize :option="option"/>
     </div>
     <br/>
-    <form class="card_piece">
-        <label for="WindTimeSelect" class="form-label">Time Options</label>
-        <div id="OtherTimeSelect">
-            <button type="button" class="btn btn-outline-primary other_time_lst" onclick="update_others(0, 1, 0)">
-                1 {{trns.hr}}
-            </button>
-            <button type="button" class="btn btn-outline-primary other_time_lst" onclick="update_others(0, 2, 1)">
-                2 {{trns.hrs}}
-            </button>
-            <button type="button" class="btn btn-outline-primary other_time_lst" onclick="update_others(0, 4, 2)">
-                4 {{trns.hrs}}
-            </button>
-            <button type="button" class="btn btn-outline-primary other_time_lst" onclick="update_others(0, 8, 3)">
-                8 {{trns.hrs}}
-            </button>
-            <button type="button" class="btn btn-outline-primary other_time_lst" onclick="update_others(0, 12, 4)">
-                12 {{trns.hrs}}
-            </button>
-            <button type="button" class="btn btn-outline-primary other_time_lst" onclick="update_others(1, 0, 5)">
-                1 {{trns.day}}
-            </button>
-            <button type="button" class="btn btn-outline-primary other_time_lst" onclick="update_others(5, 0, 6)">
-                5 {{trns.days}}
-            </button>
-            <button type="button" class="btn btn-outline-primary other_time_lst" onclick="update_others(7, 0, 7)">
-                7 {{trns.days}}
-            </button>
-            <button type="button" class="btn btn-outline-primary other_time_lst" onclick="update_others(14, 0, 8)">
-                14 {{trns.days}}
-            </button>
-            <button type="button" class="btn btn-outline-primary other_time_lst" onclick="update_others(30, 0, 9)">
-                30 {{trns.days}}
-            </button>
-        </div>
-    </form>
     <div id="RainPict">
         <v-chart autoresize :option="option"/>
     </div>
@@ -238,7 +103,7 @@
      * ================================ */
 
     var cached_current_btn, cached_days, cached_hours,
-        cached_wind_days = 0, cached_wind_hours = 1, cached_wind_btn,
+        cached_start_time = 0, cached_end_time = 1, cached_wind_btn,
         cached_altitude = 0
 
     ;
@@ -369,9 +234,15 @@
             altitude_alt_text: "Altitude in meters, e.g. 1002",
             altitude_text: "Altitude",
             set_text: "Set",
+            main_text: "Return to main page",
             time_opt_text: "Time Options",
-            time_span_page_text: "Time range data page",
-
+            start_date_time_alt_text: "Start Date and Time",
+            end_date_time_alt_text: "End Date and Time",
+            not_earlier_than: "cannot be earlier than",
+            not_later_than: "cannot be later than",
+            today_text: "today",
+            time_diff_between_text: "Time difference between start and end time cannot be longer than",
+            hours_text: "hours",
         },
         "zhs": {
             feels_like: "体感温度",
@@ -404,9 +275,15 @@
             altitude_text: "海拔",
             set_text: "设置",
             time_opt_text: "时间选项",
-            time_span_page_text: "特定时间段数据",
+            main_text: "回主页",
+            start_date_time_alt_text: "开始日期和时间",
+            end_date_time_alt_text: "结束日期和时间",
+            not_earlier_than: "不能早于",
+            not_later_than: "不能晚于",
+            today_text: "今天",
+            time_diff_between_text: "开始和结束时间的差异不能超过",
+            hours_text: "小时",
         }
-
     }
 
     var time_label_trns = {
@@ -648,19 +525,15 @@
             }
         },
         methods: {
-            async fetch_data(days, hours) {
-                var opts = []
-                var index = 0
-                if (days != 0) {
-                    opts[index] = "priorDays=" + days.toString()
-                    index++;
-                }
-                if (hours != 0) {
-                    opts[index] = "priorHrs=" + hours.toString()
-                }
+            async fetch_data(startTime, endTime) {
+                var opts = [
+                        "startTime="+startTime,
+                        "endTime="+endTime
+                    ];
+
                 var args = opts.join("&");
                 var out_data
-                await axios.get("/api/wind/rosemap?" + args).then(function (result) {
+                await axios.get("/api/ByTime/wind/rosemap?" + args).then(function (result) {
                     out_data = result.data
                 })
                 this.option.series = out_data;
@@ -682,69 +555,6 @@
             }
         }
     })
-
-    var time_label_obj = new Vue({
-        el: "#TimeTypeSelect",
-        data: {
-            trns: time_label_trns.en
-        }
-    });
-
-    var time_page_obj = new Vue({
-        el: "#time-data-page-link",
-        data:
-            {
-                trns: generic_info_trns.en
-            }
-    })
-
-    var generic_info = new Vue({
-        el: "#generic_info",
-        data: {
-            disp_data: {
-                "Time": "0000-00-00 00:00:00",
-                "tempindoor": 0.0, "humindoor": 0,
-                "tempoutdoor": 0.0, "humoutdoor": 0,
-                "dewindoor": 0.0, "dewoutdoor": 0.0,
-                "WindChill": 0.0, "heatindex": 0.0,
-                "temphumidwindindex": 0.0, "barometer": 0.0,
-                "barometer_abs": 0.0,
-                "windspd": 0.0, "highwindspd": 0.0,
-                "winddirection": 0, "avgwindspd": 0.0, "avgwinddir": 0.0,
-                "rainrate": 0.0, "raindaily": 0.0, "solarrad": 0.0,
-                "uvindex": 0.0, "heat": 0.0
-            },
-            trns: generic_info_trns.en
-        },
-        methods: {
-            async fetch_info() {
-                let altitude = localStorage.getItem('altitude')
-                let optional_altitude = "";
-                if (altitude != "null" && altitude != null && altitude != NaN && altitude != 0) {
-                    optional_altitude = "altitude=" + altitude;
-                }
-                var data_out = {
-                    data: {}
-                };
-                let query = "/api/latest"
-                if (optional_altitude != ""){
-                    query += "?" + optional_altitude;
-                }
-
-                await axios.get(query).then(function (result) {
-                    data_out.data = result.data;
-                })
-                this.disp_data = data_out.data;
-            }
-        }
-    })
-
-    var wind_time_label_obj = new Vue({
-        el: "#WindTimeSelect",
-        data: {
-            trns: time_label_trns.en
-        }
-    });
 
     var wind_analyze = new Vue({
         el: "#WindPict",
@@ -781,27 +591,26 @@
                     xAxis: {
                         type: 'time'
                     },
-                    yAxis: [
-                        {
-                            name: 'Wind Speed (Kn)',
-                            nameLocation: 'middle',
-                            nameGap: 35,
-                            axisLine: {
-                                lineStyle: {
-                                    color: '#666'
-                                }
-                            },
-                            splitLine: {
-                                lineStyle: {
-                                    color: '#ddd'
-                                }
+                    yAxis: [{
+                        name: 'Wind Speed (Kn)',
+                        nameLocation: 'middle',
+                        nameGap: 35,
+                        axisLine: {
+                            lineStyle: {
+                                color: '#666'
                             }
-                        }, {
-                            axisLine: {show: false},
-                            axisTick: {show: false},
-                            axisLabel: {show: false},
-                            splitLine: {show: false}
-                        }],
+                        },
+                        splitLine: {
+                            lineStyle: {
+                                color: '#ddd'
+                            }
+                        }
+                    }, {
+                        axisLine: {show: false},
+                        axisTick: {show: false},
+                        axisLabel: {show: false},
+                        splitLine: {show: false}
+                    }],
                     visualMap: {
                         type: 'piecewise',
                         orient: 'horizontal',
@@ -829,101 +638,93 @@
                         xAxisIndex: 0,
                         minSpan: 5
                     }],
-                    series: [
-                        {
-                            type: 'custom',
-                            renderItem: renderArrow,
-                            encode: {
-                                x: dims.time,
-                                y: dims.windSpeed
-                            },
-                            data: [],
-                            smooth: false,
-                            z: 10
-                        }, {
-                            type: 'line',
-                            symbol: 'none',
-                            encode: {
-                                x: dims.time,
-                                y: dims.windSpeed
-                            },
-                            lineStyle: {
-                                normal: {
-                                    color: 'green',
-                                    type: 'solid'
-                                }
-                            },
-                            smooth: true,
-                            data: [],
-                            z: 4
-                        }, {
-                            type: 'line',
-                            symbol: 'none',
-                            encode: {
-                                x: dims.time,
-                                y: dims.gust_filtered
-                            },
-                            data: [],
-                            smooth: true,
-                            lineStyle: {
-                                normal: {
-                                    color: '#66ccff',
-                                    type: 'solid'
-                                }
-                            }, z: 3
-                        }, {
-                            type: 'line',
-                            symbol: 'none',
-                            encode: {
-                                x: dims.time,
-                                y: dims.actual_speed
-                            },
-                            data: [],
-                            smooth: false,
-                            lineStyle: {
-                                normal: {
-                                    color: '#ff9f63',
-                                    type: 'dashed'
-                                }
-                            }, z: 2
-                        }, {
-                            type: 'line',
-                            symbol: 'none',
-                            encode: {
-                                x: dims.time,
-                                y: dims.gust
-                            },
-                            data: [],
-                            smooth: false,
-                            lineStyle: {
-                                normal: {
-                                    color: '#ffcbaf',
-                                    type: 'dashed'
-                                }
-                            }, z: 1
-                        }]
+                    series: [{
+                        type: 'custom',
+                        renderItem: renderArrow,
+                        encode: {
+                            x: dims.time,
+                            y: dims.windSpeed
+                        },
+                        data: [],
+                        smooth: false,
+                        z: 10
+                    }, {
+                        type: 'line',
+                        symbol: 'none',
+                        encode: {
+                            x: dims.time,
+                            y: dims.windSpeed
+                        },
+                        lineStyle: {
+                            normal: {
+                                color: 'green',
+                                type: 'solid'
+                            }
+                        },
+                        smooth: true,
+                        data: [],
+                        z: 4
+                    }, {
+                        type: 'line',
+                        symbol: 'none',
+                        encode: {
+                            x: dims.time,
+                            y: dims.gust_filtered
+                        },
+                        data: [],
+                        smooth: true,
+                        lineStyle: {
+                            normal: {
+                                color: '#66ccff',
+                                type: 'solid'
+                            }
+                        }, z: 3
+                    }, {
+                        type: 'line',
+                        symbol: 'none',
+                        encode: {
+                            x: dims.time,
+                            y: dims.actual_speed
+                        },
+                        data: [],
+                        smooth: false,
+                        lineStyle: {
+                            normal: {
+                                color: '#ff9f63',
+                                type: 'dashed'
+                            }
+                        }, z: 2
+                    }, {
+                        type: 'line',
+                        symbol: 'none',
+                        encode: {
+                            x: dims.time,
+                            y: dims.gust
+                        },
+                        data: [],
+                        smooth: false,
+                        lineStyle: {
+                            normal: {
+                                color: '#ffcbaf',
+                                type: 'dashed'
+                            }
+                        }, z: 1
+                    }]
                 }
             }
         },
         methods:
             {
-                async fetch_data(days, hours, object) {
+                async fetch_data(start_time, end_time) {
                     var out_data;
-                    var opts = [];
-                    var index = 0;
-                    if (days != 0) {
-                        opts[index] = "priorDays=" + days.toString()
-                        index++;
-                    }
-                    if (hours != 0) {
-                        opts[index] = "priorHrs=" + hours.toString()
-                    }
-                    if (hours == 0 && days == 0) {
-                        opts[index] = "priorHrs=1"
-                    }
+                    var opts = [
+                        "startTime="+start_time,
+                        "endTime="+end_time
+                    ];
+
                     var args = opts.join("&");
 
-                    await axios.get("/api/windByTime?" + args).then(function (result) {
+                    await axios.get("/api/ByTime/wind?" + args).then(function (result) {
                         out_data = result.data
                     })
                     if (out_data.length < 150) {
@@ -935,12 +736,6 @@
                     this.option.series[2].data = out_data;
                     this.option.series[3].data = out_data;
                     this.option.series[4].data = out_data;
-
-                    var btns = document.getElementsByClassName('wind_time_lst');
-                    for (let i = 0; i < btns.length; i++) {
-                        btns[i].className = "btn btn-outline-primary wind_time_lst";
-                    }
-                    object.className += " active ";
                 },
                 set_translate_objects(trans_name) {
                     this.option.title.text = wind_tooltip_translate[trans_name].title;
@@ -1072,9 +867,9 @@
                     }
                     var args = opts.join("&");
 
-                    await axios.get("/api/rain?" + args).then(function (result) {
-                        out_data = result.data
-                    })
+                    //await axios.get("/api/rain?" + args).then(function (result) {
+                    //    out_data = result.data
+                    //})
                     this.option.series[0].data = out_data;
                     this.option.series[1].data = out_data;
                 },
@@ -1234,9 +1029,9 @@
                     }
                     var args = opts.join("&");
 
-                    await axios.get("/api/temperature?" + args).then(function (result) {
-                        out_data = result.data
-                    })
+                    //await axios.get("/api/temperature?" + args).then(function (result) {
+                    //    out_data = result.data
+                    //})
                     var indoor_min = 1000, indoor_max = -1000, outdoor_min = 1000, outdoor_max = -1000;
                     for (var idx = 0; idx < out_data.length; idx++) {
                         if (out_data[idx][temp_dims.temp_in] > indoor_max)
@@ -1375,9 +1170,9 @@
                     }
                     var args = opts.join("&");
 
-                    await axios.get("/api/solar?" + args).then(function (result) {
-                        out_data = result.data
-                    })
+                    //await axios.get("/api/solar?" + args).then(function (result) {
+                    //    out_data = result.data
+                    //})
                     this.option.series[0].data = out_data;
                     this.option.series[1].data = out_data;
                 },
@@ -1534,9 +1329,9 @@
 
                     var args = opts.join("&");
 
-                    await axios.get("/api/barometer?" + args).then(function (result) {
-                        out_data = result.data
-                    })
+                    //await axios.get("/api/barometer?" + args).then(function (result) {
+                    //    out_data = result.data
+                    //})
                     var baro_min = 99999, baro_max = -99999;
                     for (var idx = 0; idx < out_data.length; idx++) {
                         if (out_data[idx][baro_dims.baro] > baro_max)
@@ -1571,16 +1366,59 @@
         }
     })
 
+    var date_time_select_obj = new Vue({
+        el: "#time_selection_overall",
+        data: {
+            trns: {},
+            start_date_time: moment().format('YYYY-MM-DD HH:mm:ss'),
+            end_date_time: moment().format('YYYY-MM-DD HH:mm:ss'),
+            start_datetime_err_msg:"",
+            end_datetime_err_msg: ""
+        },
+        methods:
+            {
+                checkdate: function (){
+                    let val_now = moment();
+                    let val_start = moment(this.start_date_time, 'YYYY-MM-DD HH:mm:ss');
+                    let val_end = moment(this.end_date_time, 'YYYY-MM-DD HH:mm:ss');
+                    if (val_start.isAfter(val_now))
+                    {
+                        this.start_datetime_err_msg = this.trns.start_date_time_alt_text + this.trns.not_later_than + this.trns.today_text;
+                        return;
+                    }
+                    if (val_end.isAfter(val_now))
+                    {
+                        this.end_datetime_err_msg = this.trns.end_date_time_alt_text + this.trns.not_later_than + this.trns.today_text;
+                        return;
+                    }
+                    if (val_start.isAfter(val_end))
+                    {
+                        this.start_datetime_err_msg = this.trns.start_date_time_alt_text + this.trns.not_later_than + this.trns.end_date_time_alt_text;
+                        this.end_datetime_err_msg = this.trns.end_date_time_alt_text + this.trns.not_earlier_than + this.trns.start_date_time_alt_text;
+                        return;
+                    }
+                    if (val_end.diff(val_start, 'hours') > 48)
+                    {
+                        this.end_datetime_err_msg = this.trns.time_diff_between_text + " 48 " + this.trns.hours_text;
+                        return;
+                    }
+                    this.start_datetime_err_msg = "";
+                    this.end_datetime_err_msg = "";
+                    update_values(val_start.format("YYYY-MM-DD HH:mm:ss"), val_end.format('YYYY-MM-DD HH:mm:ss'));
+                }
+            }
+    })
+
+    var title_obj = new Vue({
+        el:'#time-data-page-link',
+        data:{
+            trns: {}
+        }
+    })
+
     /* ================================
      *       Update Functions
      * ================================ */
-
-    function updateWind(days, hours, object) {
-        wind_analyze.fetch_data(days, hours, object);
-        cached_wind_btn = object;
-        cached_wind_days = days;
-        cached_wind_hours = hours;
-    }
 
     function ChangeLang(object) {
         var target_lang = object.getAttribute('optData');
@@ -1593,23 +1431,21 @@
         }
 
         localStorage.setItem('trn_name', target_lang);
-        time_label_obj.trns = time_label_trns[target_lang];
-        generic_info.trns = generic_info_trns[target_lang];
         wind_analyze.set_translate_objects(target_lang);
-        wind_time_label_obj.trns = time_label_trns[target_lang];
         windrose.option.angleAxis.data = wind_angle_list_types[target_lang];
         RainPict.set_translate_objects(target_lang);
         other_label_obj.trns = time_label_trns[target_lang];
         TempPict.set_translate_objects(target_lang);
         SolarPict.set_translate_objects(target_lang);
         alt_label_obj.trns = generic_info_trns[target_lang];
-        time_page_obj.trns = generic_info_trns[target_lang];
+        date_time_select_obj.trns = generic_info_trns[target_lang];
+        title_obj.trns = generic_info_trns[target_lang];
     }
 
     function ReadLang() {
 
         var target_lang = localStorage.getItem('trn_name');
-        if (target_lang == "null") {
+        if (target_lang === "null") {
             target_lang = "en";
         }
 
@@ -1621,10 +1457,7 @@
             }
         }
         localStorage.setItem('trn_name', target_lang);
-        time_label_obj.trns = time_label_trns[target_lang];
-        generic_info.trns = generic_info_trns[target_lang];
         wind_analyze.set_translate_objects(target_lang);
-        wind_time_label_obj.trns = time_label_trns[target_lang];
         windrose.option.angleAxis.data = wind_angle_list_types[target_lang];
         RainPict.set_translate_objects(target_lang);
         other_label_obj.trns = time_label_trns[target_lang];
@@ -1632,62 +1465,22 @@
         SolarPict.set_translate_objects(target_lang);
         BaroPict.set_translate_objects(target_lang);
         alt_label_obj.trns = generic_info_trns[target_lang];
-        time_page_obj.trns = generic_info_trns[target_lang];
+        date_time_select_obj.trns = generic_info_trns[target_lang];
+        title_obj.trns = generic_info_trns[target_lang];
     }
-
-    function UpdateRoseMap(days, hours, elem) {
-        windrose.fetch_data(days, hours)
-        var btns = document.getElementsByClassName('time_lst');
-        for (let i = 0; i < btns.length; i++) {
-            btns[i].className = "btn btn-outline-primary time_lst";
-        }
-        elem.className += " active ";
-        cached_current_btn = elem;
-        cached_days = days;
-        cached_hours = hours;
-    }
-
-    UpdateRoseMap(1, 0, document.getElementById('default_wind_rose'));
 
     ReadLang();
 
-    function update_others(days, hours, elem) {
-        RainPict.fetch_data(days, hours);
-        TempPict.fetch_data(days, hours);
-        SolarPict.fetch_data(days, hours);
-        BaroPict.fetch_data(days, hours);
+    function update_values(startTime, endTime) {
 
-        var btns = document.getElementsByClassName('other_time_lst');
-        for (let i = 0; i < btns.length; i++) {
-            btns[i].className = "btn btn-outline-primary other_time_lst";
-            if (i == elem) {
-                btns[i].className += " active ";
-            }
-        }
-        localStorage.setItem('other_btn', elem);
-        localStorage.setItem('other_days', days);
-        localStorage.setItem('other_hours', hours);
-    }
-
-    function update_values() {
-        UpdateRoseMap(cached_days, cached_hours, cached_current_btn);
-        generic_info.fetch_info();
-        if (typeof cached_wind_btn === 'undefined') {
-            cached_wind_btn = document.getElementsByClassName('wind_time_lst')[0]
-        }
-        wind_analyze.fetch_data(cached_wind_days, cached_wind_hours, cached_wind_btn);
-        var other_days = localStorage.getItem('other_days'),
-            other_hours = localStorage.getItem('other_hours'),
-            other_btn = localStorage.getItem('other_btn');
-
-        if (other_days == "null" || other_days == null)
-            other_days = 0;
-        if (other_hours == "null" || other_hours == null)
-            other_hours = 12;
-        if (other_btn == "null" || other_btn == null)
-            other_btn = 4;
-
-        update_others(other_days, other_hours, other_btn);
+        windrose.fetch_data(startTime, endTime);
+        wind_analyze.fetch_data(startTime, endTime);
+        RainPict.fetch_data(startTime, endTime);
+        TempPict.fetch_data(startTime, endTime);
+        SolarPict.fetch_data(startTime, endTime);
+        BaroPict.fetch_data(startTime, endTime);
+        localStorage.setItem('start_time', startTime);
+        localStorage.setItem('end_time', endTime);
     }
 
     function UpdateAltitude(){
@@ -1708,7 +1501,7 @@
      *       Timers
      * ================================ */
 
-    var update_rmap = setInterval(update_values, 10000);
+    //var update_rmap = setInterval(update_values, 10000);
 
     update_values();
 
