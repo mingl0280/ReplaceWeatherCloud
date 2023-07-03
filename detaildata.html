@@ -102,21 +102,22 @@
      *       Variables
      * ================================ */
 
-    var cached_current_btn, cached_days, cached_hours,
-        cached_start_time = 0, cached_end_time = 1, cached_wind_btn,
-        cached_altitude = 0
+    let cached_current_btn, cached_days, cached_hours;
+    const cached_start_time = 0, cached_end_time = 1;
+    let cached_wind_btn;
+    const cached_altitude = 0
 
     ;
 
-    var cached_selected_temp_symbol = "iso";
+    const cached_selected_temp_symbol = "iso";
 
-    var cached_selected_wind_symbol = "sea_knots";
+    const cached_selected_wind_symbol = "sea_knots";
 
     /* ================================
      *       Constants
      * ================================ */
 
-    var legendNames = {
+    const legendNames = {
         en: {
             meterPerSecond: [
                 "0.0-0.2 m/s",
@@ -184,9 +185,9 @@
             ]
         }
 
-    }
+    };
 
-    var vocs = [
+    const vocs = [
         "0.3 mg/m³",
         "0.4 mg/m³",
         "0.3 mg/m³",
@@ -203,7 +204,7 @@
 
     ];
 
-    var generic_info_trns = {
+    const generic_info_trns = {
         "en": {
             feels_like: "Feels like",
             tag_text_wind_chill: "Wind Chill",
@@ -284,9 +285,9 @@
             time_diff_between_text: "开始和结束时间的差异不能超过",
             hours_text: "小时",
         }
-    }
+    };
 
-    var time_label_trns = {
+    const time_label_trns = {
         "en": {
             all: "All",
             hr: " Hour",
@@ -301,25 +302,25 @@
             day: "天内",
             days: "天内"
         }
-    }
+    };
 
-    var dims = {
+    const dims = {
         time: 0, windSpeed: 1, R: 2, gust: 3, gust_filtered: 4, actual_speed: 5, angle_type: 6, angle_value: 7
-    }
+    };
 
-    var other_dims = {
+    const other_dims = {
         time: 0, data_raw_item: 1, data_smoothed: 2,
-    }
+    };
 
-    var temp_dims = {
+    const temp_dims = {
         time: 0, temp_out: 1, temp_in: 2
-    }
+    };
 
-    var baro_dims = {
-        time: 0, baro: 1, raw_baro:2
-    }
+    const baro_dims = {
+        time: 0, baro: 1, raw_baro: 2
+    };
 
-    var wind_angle_types = {
+    const wind_angle_types = {
         "en": {
             0: "N",
             1: "NNE",
@@ -355,14 +356,14 @@
             14: "西北",
             15: "北西北"
         }
-    }
+    };
 
-    var wind_angle_list_types = {
+    const wind_angle_list_types = {
         "en": ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"],
         "zhs": ["正北", "北北东", "东北", "东东北", "东", "东东南", "东南", "南东南", "南", "南西南", "西南", "西西南", "西", "西西北", "西北", "北西北"]
-    }
+    };
 
-    var wind_tooltip_translate = {
+    const wind_tooltip_translate = {
         "en": {
             title: "Wind Speed",
             speed: "Speed",
@@ -379,9 +380,9 @@
             gust: "阵风",
             knts: "节"
         }
-    }
+    };
 
-    var other_tooltip_translate = {
+    const other_tooltip_translate = {
         "en": {
             mmhr: "mm/hr",
             inhr: "in/hr",
@@ -415,16 +416,16 @@
             barometer_avg: "30分钟平均气压",
             smoothed: "(平滑)",
         }
-    }
+    };
 
-    var arrowSize = 16;
+    const arrowSize = 16;
 
     /* ================================
      *       Helper Functions
      * ================================ */
 
     function renderArrow(param, api) {
-        var point = api.coord([
+        const point = api.coord([
             api.value(dims.time),
             api.value(dims.windSpeed)
         ]);
@@ -451,7 +452,7 @@
      *       Vue.js Templates
      * ================================ */
 
-    var windrose = new Vue({
+    const windrose = new Vue({
         el: "#WindRose",
         data: function () {
             return {
@@ -477,7 +478,7 @@
                         "#E10100", // 32.6
                         "#E41817", // >
                     ],
-                    grid:{
+                    grid: {
                         left: 0,
                         right: 0
                     },
@@ -526,13 +527,13 @@
         },
         methods: {
             async fetch_data(startTime, endTime) {
-                var opts = [
-                        "startTime="+startTime,
-                        "endTime="+endTime
-                    ];
+                const opts = [
+                    "startTime=" + startTime,
+                    "endTime=" + endTime
+                ];
 
-                var args = opts.join("&");
-                var out_data
+                const args = opts.join("&");
+                let out_data;
                 await axios.get("/api/ByTime/wind/rosemap?" + args).then(function (result) {
                     out_data = result.data
                 })
@@ -554,9 +555,9 @@
                 this.option.radiusAxis.max = Math.round(Math.pow(2, Math.log2(total_max) + 0.1) + 1)
             }
         }
-    })
+    });
 
-    var wind_analyze = new Vue({
+    const wind_analyze = new Vue({
         el: "#WindPict",
         data: function () {
             return {
@@ -568,7 +569,7 @@
                     tooltip: {
                         trigger: 'axis',
                         formatter: function (params) {
-                            var cached_trn_name = localStorage.getItem('trn_name')
+                            const cached_trn_name = localStorage.getItem('trn_name');
                             return [
                                 echarts.format.formatTime('yyyy-MM-dd', params[0].value[dims.time])
                                 + ' ' + echarts.format.formatTime('hh:mm', params[0].value[dims.time]),
@@ -586,7 +587,7 @@
                     grid: {
                         top: 40,
                         bottom: 60,
-                        right:10
+                        right: 10
                     },
                     xAxis: {
                         type: 'time'
@@ -716,22 +717,19 @@
         methods:
             {
                 async fetch_data(start_time, end_time) {
-                    var out_data;
-                    var opts = [
-                        "startTime="+start_time,
-                        "endTime="+end_time
+                    let out_data;
+                    const opts = [
+                        "startTime=" + start_time,
+                        "endTime=" + end_time
                     ];
 
-                    var args = opts.join("&");
+                    const args = opts.join("&");
 
                     await axios.get("/api/ByTime/wind?" + args).then(function (result) {
                         out_data = result.data
                     })
-                    if (out_data.length < 150) {
-                        this.option.series[0].data = out_data;
-                    } else {
-                        this.option.series[0].data = [];
-                    }
+
+                    this.option.series[0].data = out_data;
                     this.option.series[1].data = out_data;
                     this.option.series[2].data = out_data;
                     this.option.series[3].data = out_data;
@@ -742,16 +740,9 @@
                     this.$forceUpdate();
                 }
             }
-    })
-
-    var other_label_obj = new Vue({
-        el: "#OtherTimeSelect",
-        data: {
-            trns: {}
-        }
     });
 
-    var RainPict = new Vue({
+    const RainPict = new Vue({
         el: "#RainPict",
         data: function () {
             return {
@@ -763,7 +754,7 @@
                     tooltip: {
                         trigger: 'axis',
                         formatter: function (params) {
-                            var cached_trn_name = localStorage.getItem('trn_name')
+                            const cached_trn_name = localStorage.getItem('trn_name');
                             return [
                                 echarts.format.formatTime('yyyy-MM-dd', params[0].value[other_dims.time])
                                 + ' ' + echarts.format.formatTime('hh:mm', params[0].value[other_dims.time]),
@@ -829,32 +820,32 @@
                         data: [],
                         z: 1
                     },
-                    {
-                        type: 'line',
-                        symbol: 'none',
-                        encode: {
-                            x: other_dims.time,
-                            y: other_dims.data_smoothed
-                        },
-                        lineStyle: {
-                            normal: {
-                                color: 'blue',
-                                type: 'solid'
-                            }
-                        },
-                        smooth: true,
-                        data: [],
-                        z: 1
-                    }]
+                        {
+                            type: 'line',
+                            symbol: 'none',
+                            encode: {
+                                x: other_dims.time,
+                                y: other_dims.data_smoothed
+                            },
+                            lineStyle: {
+                                normal: {
+                                    color: 'blue',
+                                    type: 'solid'
+                                }
+                            },
+                            smooth: true,
+                            data: [],
+                            z: 1
+                        }]
                 }
             }
         },
         methods:
             {
                 async fetch_data(days, hours,) {
-                    var out_data;
-                    var opts = [];
-                    var index = 0;
+                    let out_data;
+                    const opts = [];
+                    let index = 0;
                     if (days != 0) {
                         opts[index] = "priorDays=" + days.toString()
                         index++;
@@ -865,7 +856,7 @@
                     if (hours == 0 && days == 0) {
                         opts[index] = "priorHrs=1"
                     }
-                    var args = opts.join("&");
+                    const args = opts.join("&");
 
                     //await axios.get("/api/rain?" + args).then(function (result) {
                     //    out_data = result.data
@@ -878,9 +869,9 @@
                     this.$forceUpdate();
                 }
             }
-    })
+    });
 
-    var TempPict = new Vue({
+    const TempPict = new Vue({
         el: "#TempPict",
         data: function () {
             return {
@@ -892,7 +883,7 @@
                     tooltip: {
                         trigger: 'axis',
                         formatter: function (params) {
-                            var cached_trn_name = localStorage.getItem('trn_name')
+                            const cached_trn_name = localStorage.getItem('trn_name');
                             return [
                                 echarts.format.formatTime('yyyy-MM-dd', params[0].value[temp_dims.time])
                                 + ' ' + echarts.format.formatTime('hh:mm', params[0].value[temp_dims.time]),
@@ -1010,13 +1001,13 @@
         methods:
             {
                 async fetch_data(days, hours) {
-                    var target_lang = localStorage.getItem('trn_name');
+                    let target_lang = localStorage.getItem('trn_name');
                     if (target_lang == "null") {
                         target_lang = "en";
                     }
-                    var out_data;
-                    var opts = [];
-                    var index = 0;
+                    let out_data;
+                    const opts = [];
+                    let index = 0;
                     if (days != 0) {
                         opts[index] = "priorDays=" + days.toString()
                         index++;
@@ -1027,13 +1018,13 @@
                     if (hours == 0 && days == 0) {
                         opts[index] = "priorHrs=1"
                     }
-                    var args = opts.join("&");
+                    const args = opts.join("&");
 
                     //await axios.get("/api/temperature?" + args).then(function (result) {
                     //    out_data = result.data
                     //})
-                    var indoor_min = 1000, indoor_max = -1000, outdoor_min = 1000, outdoor_max = -1000;
-                    for (var idx = 0; idx < out_data.length; idx++) {
+                    let indoor_min = 1000, indoor_max = -1000, outdoor_min = 1000, outdoor_max = -1000;
+                    for (let idx = 0; idx < out_data.length; idx++) {
                         if (out_data[idx][temp_dims.temp_in] > indoor_max)
                             indoor_max = out_data[idx][temp_dims.temp_in];
                         if (out_data[idx][temp_dims.temp_in] < indoor_min)
@@ -1060,9 +1051,9 @@
                     this.$forceUpdate();
                 }
             }
-    })
+    });
 
-    var SolarPict = new Vue({
+    const SolarPict = new Vue({
         el: "#SolarPict",
         data: function () {
             return {
@@ -1074,7 +1065,7 @@
                     tooltip: {
                         trigger: 'axis',
                         formatter: function (params) {
-                            var cached_trn_name = localStorage.getItem('trn_name')
+                            const cached_trn_name = localStorage.getItem('trn_name');
                             return [
                                 echarts.format.formatTime('yyyy-MM-dd', params[0].value[other_dims.time])
                                 + ' ' + echarts.format.formatTime('hh:mm', params[0].value[other_dims.time]),
@@ -1155,9 +1146,9 @@
         methods:
             {
                 async fetch_data(days, hours,) {
-                    var out_data;
-                    var opts = [];
-                    var index = 0;
+                    let out_data;
+                    const opts = [];
+                    let index = 0;
                     if (days != 0) {
                         opts[index] = "priorDays=" + days.toString()
                         index++;
@@ -1168,7 +1159,7 @@
                     if (hours == 0 && days == 0) {
                         opts[index] = "priorHrs=1"
                     }
-                    var args = opts.join("&");
+                    const args = opts.join("&");
 
                     //await axios.get("/api/solar?" + args).then(function (result) {
                     //    out_data = result.data
@@ -1181,9 +1172,9 @@
                     this.$forceUpdate();
                 }
             }
-    })
+    });
 
-    var BaroPict = new Vue({
+    const BaroPict = new Vue({
         el: "#BaroPict",
         data: function () {
             return {
@@ -1195,7 +1186,7 @@
                     tooltip: {
                         trigger: 'axis',
                         formatter: function (params) {
-                            var cached_trn_name = localStorage.getItem('trn_name')
+                            const cached_trn_name = localStorage.getItem('trn_name');
                             return [
                                 echarts.format.formatTime('yyyy-MM-dd', params[0].value[baro_dims.time])
                                 + ' ' + echarts.format.formatTime('hh:mm', params[0].value[baro_dims.time]),
@@ -1278,21 +1269,22 @@
                             x: baro_dims.time,
                             y: baro_dims.raw_baro
                         },
-                        lineStyle:{
+                        lineStyle: {
                             color: '#aaaaaa'
                         },
                         smooth: true,
                         data: [],
-                        z: 1}
+                        z: 1
+                    }
                     ],
-                    graphic:[
+                    graphic: [
                         {
                             type: 'text',
-                            z:100,
+                            z: 100,
                             left: '2.5%',
                             top: '3.5%',
                             style: {
-                                text:""
+                                text: ""
                             }
                         }
                     ]
@@ -1302,38 +1294,30 @@
         },
         methods:
             {
-                async fetch_data(days, hours) {
-                    var target_lang = localStorage.getItem('trn_name');
+                async fetch_data(start_time, end_time) {
+                    let target_lang = localStorage.getItem('trn_name');
                     if (target_lang == "null") {
                         target_lang = "en";
                     }
-                    var out_data;
-                    var opts = [];
-                    var index = 0;
-                    if (days != 0) {
-                        opts[index] = "priorDays=" + days.toString()
-                        index++;
-                    }
-                    if (hours != 0) {
-                        opts[index] = "priorHrs=" + hours.toString()
-                        index++;
-                    }
-                    if (hours == 0 && days == 0) {
-                        opts[index] = "priorHrs=1"
-                        index++;
-                    }
-                    var altitude = localStorage.getItem('altitude')
-                    if (altitude != "null" && altitude != null){
+                    let out_data;
+                    const opts = [
+                        "startTime=" + start_time,
+                        "endTime=" + end_time,
+                    ];
+                    let index = 2;
+
+                    const altitude = localStorage.getItem('altitude');
+                    if (altitude != "null" && altitude != null) {
                         opts[index] = "altitude=" + altitude;
                     }
 
-                    var args = opts.join("&");
+                    let args = opts.join("&");
 
-                    //await axios.get("/api/barometer?" + args).then(function (result) {
-                    //    out_data = result.data
-                    //})
-                    var baro_min = 99999, baro_max = -99999;
-                    for (var idx = 0; idx < out_data.length; idx++) {
+                    await axios.get("/api/ByTime/barometer?" + args).then(function (result) {
+                        out_data = result.data
+                    })
+                    let baro_min = 99999, baro_max = -99999;
+                    for (let idx = 0; idx < out_data.length; idx++) {
                         if (out_data[idx][baro_dims.baro] > baro_max)
                             baro_max = out_data[idx][baro_dims.baro];
                         if (out_data[idx][baro_dims.baro] < baro_min)
@@ -1357,48 +1341,44 @@
                     this.$forceUpdate();
                 }
             }
-    })
+    });
 
-    var alt_label_obj = new Vue({
+    const alt_label_obj = new Vue({
         el: "#altitude_input",
         data: {
             trns: {}
         }
-    })
+    });
 
-    var date_time_select_obj = new Vue({
+    const date_time_select_obj = new Vue({
         el: "#time_selection_overall",
         data: {
             trns: {},
             start_date_time: moment().format('YYYY-MM-DD HH:mm:ss'),
             end_date_time: moment().format('YYYY-MM-DD HH:mm:ss'),
-            start_datetime_err_msg:"",
+            start_datetime_err_msg: "",
             end_datetime_err_msg: ""
         },
         methods:
             {
-                checkdate: function (){
+                checkdate: function () {
                     let val_now = moment();
                     let val_start = moment(this.start_date_time, 'YYYY-MM-DD HH:mm:ss');
                     let val_end = moment(this.end_date_time, 'YYYY-MM-DD HH:mm:ss');
-                    if (val_start.isAfter(val_now))
-                    {
+                    if (val_start.isAfter(val_now)) {
                         this.start_datetime_err_msg = this.trns.start_date_time_alt_text + this.trns.not_later_than + this.trns.today_text;
                         return;
                     }
-                    if (val_end.isAfter(val_now))
-                    {
+                    if (val_end.isAfter(val_now)) {
                         this.end_datetime_err_msg = this.trns.end_date_time_alt_text + this.trns.not_later_than + this.trns.today_text;
                         return;
                     }
-                    if (val_start.isAfter(val_end))
-                    {
+                    if (val_start.isAfter(val_end)) {
                         this.start_datetime_err_msg = this.trns.start_date_time_alt_text + this.trns.not_later_than + this.trns.end_date_time_alt_text;
                         this.end_datetime_err_msg = this.trns.end_date_time_alt_text + this.trns.not_earlier_than + this.trns.start_date_time_alt_text;
                         return;
                     }
-                    if (val_end.diff(val_start, 'hours') > 48)
-                    {
+                    if (val_end.diff(val_start, 'hours') > 48) {
                         this.end_datetime_err_msg = this.trns.time_diff_between_text + " 48 " + this.trns.hours_text;
                         return;
                     }
@@ -1407,22 +1387,22 @@
                     update_values(val_start.format("YYYY-MM-DD HH:mm:ss"), val_end.format('YYYY-MM-DD HH:mm:ss'));
                 }
             }
-    })
+    });
 
-    var title_obj = new Vue({
-        el:'#time-data-page-link',
-        data:{
+    const title_obj = new Vue({
+        el: '#time-data-page-link',
+        data: {
             trns: {}
         }
-    })
+    });
 
     /* ================================
      *       Update Functions
      * ================================ */
 
     function ChangeLang(object) {
-        var target_lang = object.getAttribute('optData');
-        var btns = document.getElementsByClassName('lang_lst');
+        const target_lang = object.getAttribute('optData');
+        const btns = document.getElementsByClassName('lang_lst');
         for (let i = 0; i < btns.length; i++) {
             btns[i].className = 'btn btn-outline-primary lang_lst';
             if (btns[i].getAttribute('optData') === target_lang) {
@@ -1434,7 +1414,6 @@
         wind_analyze.set_translate_objects(target_lang);
         windrose.option.angleAxis.data = wind_angle_list_types[target_lang];
         RainPict.set_translate_objects(target_lang);
-        other_label_obj.trns = time_label_trns[target_lang];
         TempPict.set_translate_objects(target_lang);
         SolarPict.set_translate_objects(target_lang);
         alt_label_obj.trns = generic_info_trns[target_lang];
@@ -1444,7 +1423,7 @@
 
     function ReadLang() {
 
-        var target_lang = localStorage.getItem('trn_name');
+        let target_lang = localStorage.getItem('trn_name');
         if (target_lang === "null") {
             target_lang = "en";
         }
@@ -1460,7 +1439,6 @@
         wind_analyze.set_translate_objects(target_lang);
         windrose.option.angleAxis.data = wind_angle_list_types[target_lang];
         RainPict.set_translate_objects(target_lang);
-        other_label_obj.trns = time_label_trns[target_lang];
         TempPict.set_translate_objects(target_lang);
         SolarPict.set_translate_objects(target_lang);
         BaroPict.set_translate_objects(target_lang);
