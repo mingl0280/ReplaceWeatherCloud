@@ -139,6 +139,12 @@
 </html>
 
 <script lang="javascript">
+    // Check language before everything else.
+    let target_lang = localStorage.getItem('trn_name');
+    if (target_lang === "null") {
+        target_lang = "en";
+        localStorage.setItem('trn_name', target_lang);
+    }
     Vue.component("v-chart", VueECharts)
 
     /* ================================
@@ -1459,12 +1465,6 @@
     }
 
     function ReadLang() {
-
-        let target_lang = localStorage.getItem('trn_name');
-        if (target_lang === "null") {
-            target_lang = "en";
-        }
-
         let btns = document.getElementsByClassName('lang_lst');
         for (let i = 0; i < btns.length; i++) {
             btns[i].className = 'btn btn-outline-primary lang_lst';
