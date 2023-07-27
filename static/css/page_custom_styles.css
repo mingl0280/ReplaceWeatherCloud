@@ -90,14 +90,39 @@ table tr td:nth-child(2) {
 
 .inline-inputs{
     display: inline;
-    width: 80%;
+    width: 75%;
 }
 
 .inline-inputs-less{
     display: inline;
-    width: 72%;
+    width: 64%;
 }
 
 .vert-align-middle{
     vertical-align: middle;
+}
+
+.row-no-margin {
+    --bs-gutter-x: 1.5rem;
+    --bs-gutter-y: 0;
+    display: flex;
+    flex-wrap: wrap;
+}
+.col-hint-1{
+    width:22%;
+    text-align: center;
+    flex: 0 0 auto;
+}
+.col-btn-1{
+    text-align: center;
+    width: 14%;
+    padding-top: 3px;
+}
+.select-group{
+    line-height: 28px;
+    padding-top: 3px;
+}
+.radio-btn-group{
+    display: inline-block;
+    padding-right: 0.25em;
 }

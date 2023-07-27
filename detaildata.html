@@ -46,28 +46,71 @@
     <form class="card_piece">
         <div id="altitude_input" class="form-row">
             <div class="form-group" style="display: inline">
-                <label for="altitude_value_input" class="vert-align-middle"
-                       style="min-width: 7.165em;">{{trns.altitude_text}}:</label>
-                <input type="number" class="form-control col-md-6 vert-align-middle inline-inputs-less"
-                       id="altitude_value_input" v-bind:placeholder="trns.altitude_alt_text" />
-                <button type="button" class="btn btn-success vert-align-middle" onclick="UpdateAltitude()"
-                        style="display: inline;">{{trns.set_text}}
-                </button>
+                <div class="row-no-margin">
+                    <div class="col-hint-1">
+                        <label for="altitude_value_input" class="vert-align-middle"
+                               style="min-width: 7.165em;">{{trns.altitude_text}}:</label>
+                    </div>
+                    <div class="inline-inputs-less">
+                        <input type="number" class="form-control vert-align-middle"
+                               id="altitude_value_input" v-bind:placeholder="trns.altitude_alt_text" />
+                    </div>
+                    <div class="col-btn-1">
+                        <button type="button" class="btn btn-success vert-align-middle" onclick="UpdateAltitude()"
+                                style="display: inline;">{{trns.set_text}}
+                        </button>
+                    </div>
+                </div>
+                <div class="row-no-margin">
+                    <div class="col-hint-1">
+                        <label class="vert-align-middle" style="min-width: 7.165em;">
+                            {{trns.temp_select_text}}
+                        </label>
+                    </div>
+                    <div class="select-group">
+                        <div class="radio-btn-group">
+                            <input type="radio" id="temp_unit_celsius" name="temp_unit_opts"
+                                   value="0" onchange="UpdateTempUnit(0)" checked="checked"/>
+                            <label for="temp_unit_celsius">{{trns.temp_unit_celsius}}</label>
+                        </div>
+                        <div class="radio-btn-group">
+                            <input type="radio" id="temp_unit_fahrenheit" name="temp_unit_opts"
+                                   value="1" onchange="UpdateTempUnit(1)"/>
+                            <label
+                                    for="temp_unit_fahrenheit">{{trns.temp_unit_fahrenheit}}</label>
+                        </div>
+                        <div class="radio-btn-group">
+                            <input type="radio" id="temp_unit_kelvin" name="temp_unit_opts"
+                                   value="2" onchange="UpdateTempUnit(2)"/>
+                            <label for="temp_unit_kelvin">{{trns.temp_unit_kelvin}}</label>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </form>
     <form class="card_piece">
         <div id="time_selection_overall">
             <div class="form-group" style="display: inline">
-                <label for="start_date_time">{{trns.start_date_time_alt_text}}:</label>
-                <input type="datetime-local" class="form-control col-md-3 inline-inputs" id="start_date_time"
-                       v-model="start_date_time" @change="checkdate()" >
-                <label style="color: red">{{start_datetime_err_msg}}</label>
-                <br />
-                <label for="end_date_time">{{trns.end_date_time_alt_text}}:</label>
-                <input type="datetime-local" class="form-control col-md-3 inline-inputs" id="end_date_time"
-                       v-model="end_date_time"  @change="checkdate()">
-                <label style="color: red">{{end_datetime_err_msg}}</label>
+                <div class="row-no-margin">
+                    <div class="col-hint-1">
+                        <label for="start_date_time">{{trns.start_date_time_alt_text}}:</label>
+                    </div>
+                    <div class="inline-inputs">
+                        <input type="datetime-local" class="form-control" id="start_date_time"
+                               v-model="start_date_time" @change="checkdate()">
+                        <label style="color: red">{{start_datetime_err_msg}}</label>
+                    </div>
+                    <br/>
+                    <div class="col-hint-1">
+                        <label for="end_date_time">{{trns.end_date_time_alt_text}}:</label>
+                    </div>
+                    <div class="inline-inputs">
+                        <input type="datetime-local" class="form-control" id="end_date_time"
+                               v-model="end_date_time" @change="checkdate()">
+                        <label style="color: red">{{end_datetime_err_msg}}</label>
+                    </div>
+                </div>
             </div>
         </div>
     </form>
@@ -244,6 +287,10 @@
             today_text: "today",
             time_diff_between_text: "Time difference between start and end time cannot be longer than",
             hours_text: "hours",
+            temp_select_text: "Temperature Unit: ",
+            temp_unit_celsius: "Celsius (℃)",
+            temp_unit_fahrenheit: "Fahrenheit (℉)",
+            temp_unit_kelvin: "Kelvin (K)",
         },
         "zhs": {
             feels_like: "体感温度",
@@ -284,6 +331,10 @@
             today_text: "今天",
             time_diff_between_text: "开始和结束时间的差异不能超过",
             hours_text: "小时",
+            temp_select_text: "温度单位: ",
+            temp_unit_celsius: "摄氏度 (℃)",
+            temp_unit_fahrenheit: "华氏度 (℉)",
+            temp_unit_kelvin: "开尔文 (K)",
         }
     };
 
@@ -842,25 +893,18 @@
         },
         methods:
             {
-                async fetch_data(days, hours,) {
-                    let out_data;
-                    const opts = [];
-                    let index = 0;
-                    if (days != 0) {
-                        opts[index] = "priorDays=" + days.toString()
-                        index++;
-                    }
-                    if (hours != 0) {
-                        opts[index] = "priorHrs=" + hours.toString()
-                    }
-                    if (hours == 0 && days == 0) {
-                        opts[index] = "priorHrs=1"
-                    }
-                    const args = opts.join("&");
+                async fetch_data(startTime, endTime) {
+                    const opts = [
+                    "startTime=" + startTime,
+                    "endTime=" + endTime
+                    ];
 
-                    //await axios.get("/api/rain?" + args).then(function (result) {
-                    //    out_data = result.data
-                    //})
+                    const args = opts.join("&");
+                    let out_data;
+
+                    await axios.get("/api/ByTime/rain?" + args).then(function (result) {
+                        out_data = result.data
+                    })
                     this.option.series[0].data = out_data;
                     this.option.series[1].data = out_data;
                 },
@@ -1000,29 +1044,28 @@
         },
         methods:
             {
-                async fetch_data(days, hours) {
+                async fetch_data(start_time, end_time) {
                     let target_lang = localStorage.getItem('trn_name');
                     if (target_lang == "null") {
                         target_lang = "en";
                     }
                     let out_data;
-                    const opts = [];
-                    let index = 0;
-                    if (days != 0) {
-                        opts[index] = "priorDays=" + days.toString()
-                        index++;
-                    }
-                    if (hours != 0) {
-                        opts[index] = "priorHrs=" + hours.toString()
-                    }
-                    if (hours == 0 && days == 0) {
-                        opts[index] = "priorHrs=1"
-                    }
-                    const args = opts.join("&");
+                    const opts = [
+                        "startTime=" + start_time,
+                        "endTime=" + end_time,
+                    ];
+                    let index = 2;
 
-                    //await axios.get("/api/temperature?" + args).then(function (result) {
-                    //    out_data = result.data
-                    //})
+                    const unit = localStorage.getItem('TempUnit');
+                    if (unit != "null" && unit != null) {
+                        opts[index] = "unit=" + unit;
+                    }
+
+                    let args = opts.join("&");
+
+                    await axios.get("/api/ByTime/temperature?" + args).then(function (result) {
+                        out_data = result.data
+                    })
                     let indoor_min = 1000, indoor_max = -1000, outdoor_min = 1000, outdoor_max = -1000;
                     for (let idx = 0; idx < out_data.length; idx++) {
                         if (out_data[idx][temp_dims.temp_in] > indoor_max)
@@ -1145,25 +1188,18 @@
         },
         methods:
             {
-                async fetch_data(days, hours,) {
-                    let out_data;
-                    const opts = [];
-                    let index = 0;
-                    if (days != 0) {
-                        opts[index] = "priorDays=" + days.toString()
-                        index++;
-                    }
-                    if (hours != 0) {
-                        opts[index] = "priorHrs=" + hours.toString()
-                    }
-                    if (hours == 0 && days == 0) {
-                        opts[index] = "priorHrs=1"
-                    }
-                    const args = opts.join("&");
+                async fetch_data(startTime, endTime) {
+                    const opts = [
+                    "startTime=" + startTime,
+                    "endTime=" + endTime
+                    ];
 
-                    //await axios.get("/api/solar?" + args).then(function (result) {
-                    //    out_data = result.data
-                    //})
+                    const args = opts.join("&");
+                    let out_data;
+
+                    await axios.get("/api/ByTime/solar?" + args).then(function (result) {
+                        out_data = result.data
+                    });
                     this.option.series[0].data = out_data;
                     this.option.series[1].data = out_data;
                 },
@@ -1343,7 +1379,7 @@
             }
     });
 
-    const alt_label_obj = new Vue({
+    const alt_and_temp_select_obj = new Vue({
         el: "#altitude_input",
         data: {
             trns: {}
@@ -1416,7 +1452,8 @@
         RainPict.set_translate_objects(target_lang);
         TempPict.set_translate_objects(target_lang);
         SolarPict.set_translate_objects(target_lang);
-        alt_label_obj.trns = generic_info_trns[target_lang];
+        BaroPict.set_translate_objects(target_lang);
+        alt_and_temp_select_obj.trns = generic_info_trns[target_lang];
         date_time_select_obj.trns = generic_info_trns[target_lang];
         title_obj.trns = generic_info_trns[target_lang];
     }
@@ -1442,7 +1479,7 @@
         TempPict.set_translate_objects(target_lang);
         SolarPict.set_translate_objects(target_lang);
         BaroPict.set_translate_objects(target_lang);
-        alt_label_obj.trns = generic_info_trns[target_lang];
+        alt_and_temp_select_obj.trns = generic_info_trns[target_lang];
         date_time_select_obj.trns = generic_info_trns[target_lang];
         title_obj.trns = generic_info_trns[target_lang];
     }
@@ -1450,7 +1487,6 @@
     ReadLang();
 
     function update_values(startTime, endTime) {
-
         windrose.fetch_data(startTime, endTime);
         wind_analyze.fetch_data(startTime, endTime);
         RainPict.fetch_data(startTime, endTime);
@@ -1464,6 +1500,12 @@
     function UpdateAltitude(){
         let altitude = Number(document.getElementById('altitude_value_input').value);
         localStorage.setItem('altitude', altitude.toString());
+        date_time_select_obj.checkdate();
+    }
+
+    function UpdateTempUnit(unit_value){
+        localStorage.setItem('TempUnit', unit_value.toString());
+        date_time_select_obj.checkdate();
     }
 
     function ReadAlt() {

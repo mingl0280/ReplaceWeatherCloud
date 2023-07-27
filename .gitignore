@@ -1,8 +1,8 @@
 config.yaml
 favicon.ico
-flushdata.py
+scripts/flushdata.py
 missed_logs*
-pgdb.py
+scripts/pgdb.py
 *.http
 *.old
 venv/

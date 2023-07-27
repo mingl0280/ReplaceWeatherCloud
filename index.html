@@ -1609,7 +1609,7 @@
     function ReadLang() {
 
         var target_lang = localStorage.getItem('trn_name');
-        if (target_lang == "null") {
+        if (!target_lang) {
             target_lang = "en";
         }
 

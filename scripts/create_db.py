@@ -3,13 +3,13 @@ import shutil
 from os.path import exists
 import yaml
 
-if not exists("config.yaml"):
-    shutil.copy("default.yaml", "config.yaml")
+if not exists("../config.yaml"):
+    shutil.copy("../default.yaml", "config.yaml")
     print("Please edit config.yaml to represent your current configuration!")
     print("App will now quit.")
     exit(0)
 else:
-    with open("config.yaml", 'r', encoding='utf-8') as in_file:
+    with open("../config.yaml", 'r', encoding='utf-8') as in_file:
         yaml_content = in_file.read()
         cfg_items = yaml.load(yaml_content)
 
