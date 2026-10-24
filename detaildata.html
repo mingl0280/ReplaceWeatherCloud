@@ -1420,8 +1420,9 @@
             {
                 check_date_run: function () {
                     let val_now = moment();
-                    let val_start = moment(this.start_date_time, 'YYYY-MM-DD HH:mm:ss', true);
-                    let val_end = moment(this.end_date_time, 'YYYY-MM-DD HH:mm:ss', true);
+                    const date_formats = ['YYYY-MM-DD HH:mm:ss', 'YYYY-MM-DDTHH:mm:ss', 'YYYY-MM-DDTHH:mm'];
+                    let val_start = moment(this.start_date_time, date_formats, true);
+                    let val_end = moment(this.end_date_time, date_formats, true);
                     if (!val_start.isValid() || !val_end.isValid()) {
                         this.start_datetime_err_msg = "YYYY-MM-DD HH:mm:ss";
                         this.end_datetime_err_msg = "YYYY-MM-DD HH:mm:ss";
