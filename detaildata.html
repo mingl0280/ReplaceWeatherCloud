@@ -141,7 +141,7 @@
 <script lang="javascript">
     // Check language before everything else.
     let target_lang = localStorage.getItem('trn_name');
-    if (target_lang === "null") {
+    if (!target_lang) {
         target_lang = "en";
         localStorage.setItem('trn_name', target_lang);
     }
@@ -154,9 +154,8 @@
     let cached_current_btn, cached_days, cached_hours;
     const cached_start_time = 0, cached_end_time = 1;
     let cached_wind_btn;
-    const cached_altitude = 0
-
-    ;
+    const cached_altitude = 0;
+    let timer;
 
     const cached_selected_temp_symbol = "iso";
 
@@ -502,6 +501,20 @@
                 lineWidth: 1
             })
         };
+    }
+
+    function debounce(fn, delay=2000) // debounce function
+    {
+        let timer=null;
+        return function (...args){
+            if (timer !== null){
+                clearTimeout(timer);
+                timer = null;
+            }
+            timer = setTimeout(()=>{
+                fn.call(this, ...args)
+            }, delay);
+        }
     }
 
 
@@ -1399,11 +1412,12 @@
             start_date_time: moment().format('YYYY-MM-DD HH:mm:ss'),
             end_date_time: moment().format('YYYY-MM-DD HH:mm:ss'),
             start_datetime_err_msg: "",
-            end_datetime_err_msg: ""
+            end_datetime_err_msg: "",
+            last_op_time: null,
         },
         methods:
             {
-                checkdate: function () {
+                check_date_run: function () {
                     let val_now = moment();
                     let val_start = moment(this.start_date_time, 'YYYY-MM-DD HH:mm:ss');
                     let val_end = moment(this.end_date_time, 'YYYY-MM-DD HH:mm:ss');
@@ -1427,7 +1441,12 @@
                     this.start_datetime_err_msg = "";
                     this.end_datetime_err_msg = "";
                     update_values(val_start.format("YYYY-MM-DD HH:mm:ss"), val_end.format('YYYY-MM-DD HH:mm:ss'));
-                }
+
+                },
+                checkdate:debounce(function(){
+                    this.check_date_run();
+                }, 5000)
+
             }
     });
 

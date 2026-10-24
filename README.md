@@ -41,5 +41,7 @@ You have 2 options to run the website:
 2. run `python main.py` and it should pull in configurations from config.yaml. 
 
 ## Other tasks to do
-- Not support switching between units. For example, Celsius to Fahrenheit or m/s to km/h to knots.
+- ~~Not support switching between units. For example, Celsius to Fahrenheit or m/s to km/h to knots.~~
+- Now supported switching temperature units in detaildata.html.
 - May need more language support
+- Add humidity curve.

@@ -1608,11 +1608,17 @@
         other_label_obj.trns = time_label_trns[target_lang];
         TempPict.set_translate_objects(target_lang);
         SolarPict.set_translate_objects(target_lang);
+        BaroPict.set_translate_objects(target_lang);
         alt_label_obj.trns = generic_info_trns[target_lang];
         time_page_obj.trns = generic_info_trns[target_lang];
     }
 
     function ReadLang() {
+        let target_lang = localStorage.getItem('trn_name');
+        if (!target_lang) {
+            target_lang = "en";
+            localStorage.setItem('trn_name', target_lang);
+        }
         let btns = document.getElementsByClassName('lang_lst');
         for (let i = 0; i < btns.length; i++) {
             btns[i].className = 'btn btn-outline-primary lang_lst';

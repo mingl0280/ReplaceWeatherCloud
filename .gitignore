@@ -8,3 +8,9 @@ scripts/pgdb.py
 venv/
 .idea/
 libs/
+.local-backups/
+__pycache__/
+*.pyc
+unreal_mcp_advanced.log
+/pgdb.py
+/flushdata.py

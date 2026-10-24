@@ -22,11 +22,12 @@
 import shutil
 from datetime import datetime as dt
 from decimal import Decimal
-from os.path import exists
+import time
 from typing import Optional
 
+import psycopg
 import uvicorn
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Request, Response
 from starlette.responses import FileResponse
 from starlette.staticfiles import StaticFiles
 
@@ -42,6 +43,8 @@ db_conn.prepare_threshold = 0
 
 check_config()
 
+request_cache={}
+
 app = FastAPI()
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -50,6 +53,29 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 async def root():
     return FileResponse('index.html')
 
+def make_request_key(request: Request):
+    # 这里以IP+path+query参数组成唯一key，可以根据实际需求调整
+    client_ip = request.client.host
+    path = request.url.path
+    query = str(request.query_params)
+    return f"{client_ip}:{path}:{query}"
+
+@app.middleware("http")
+async def deduplication_middleware(request: Request, call_next):
+
+    if request.url.path == '/v01/set':
+        print(f"request = {request.url.path} {request.query_params}")
+        key = make_request_key(request)
+        now = time.time()
+        # 检查key是否存在且未过5秒
+        last_time = request_cache.get(key)
+        if last_time and now - last_time < 5:
+            # 重复请求，直接返回 200
+            return Response(status_code=200)
+        # 不是重复，记录时间并继续
+        request_cache[key] = now
+    response = await call_next(request)
+    return response
 
 @app.get("/detaildata.html")
 async def detail_response():
@@ -242,6 +268,7 @@ async def set_api(wid: str, key: str, tempin: int, humin: int,
                   wdiravg: int, rainrate: int, rain: int, solarrad: int,
                   uvi: int, battery: str, datestr: str = Query(None, alias="date"),
                   timestr: str = Query(None, alias="time")):
+    global db_conn
     check_db()
     local_tm = dt.now()
     utc_tm = dt.utcnow()
@@ -262,6 +289,8 @@ async def set_api(wid: str, key: str, tempin: int, humin: int,
     rain_rate = rainrate / 10
     dew_point_outdoor = dew / 10
     dew_point_indoor = dewin / 10
+
+    # handle error
     if temp_indoor < -100 or solar_radiation < -100 or temp_outdoor < -100 or heat_index_val < -100 or thw < -1000 or \
             dew_point_outdoor < -100 or dew_point_indoor < -100:
         return 200
@@ -307,6 +336,7 @@ async def set_api(wid: str, key: str, tempin: int, humin: int,
     except Exception as ex:
         print(str(ex))
         db_conn.close()
+        check_db()
         return 500
 
     return 200

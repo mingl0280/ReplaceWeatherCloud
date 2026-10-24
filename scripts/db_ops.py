@@ -4,6 +4,7 @@ from psycopg.rows import dict_row
 
 from scripts.configs import GlobalConfig
 
+import logging
 
 async def query_db_by_time(sql_query_str: str,
                            start_timestamp: str = Query(None, alias="startTime"),
@@ -76,6 +77,7 @@ async def get_raw_solar_by_time(start_timestamp: str = Query(None, alias="startT
 
 def check_db():
     global db_conn
+    logging.info(GlobalConfig.cfg["database"]["connection_str"])
     if db_conn.broken:
         db_conn.close()
         db_conn = psycopg.connect(GlobalConfig.cfg["database"]["connection_str"], row_factory=dict_row)
@@ -86,4 +88,4 @@ def check_db():
         db_conn.prepare_threshold = 0
 
 
-db_conn = psycopg.connect(GlobalConfig.cfg["database"]["connection_str"], row_factory=dict_row)
+db_conn: psycopg.Connection = psycopg.connect(GlobalConfig.cfg["database"]["connection_str"], row_factory=dict_row)

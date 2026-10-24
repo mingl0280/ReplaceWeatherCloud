@@ -1,0 +1,8 @@
+@font-face {
+  font-family: 'DigitalDismay';
+  src: url('/static/fonts/DigitalDismay.eot');
+  src: url('/static/fonts/DigitalDismay.eot?#iefix') format('embedded-opentype'),
+       url('/static/fonts/DigitalDismay.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+}

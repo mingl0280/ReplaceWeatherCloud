@@ -2,7 +2,6 @@ import shutil
 from os.path import exists
 
 import yaml
-import yaml.loader as ldr
 
 
 class Config:
@@ -31,7 +30,7 @@ def check_config():
     else:
         with open("config.yaml", 'r', encoding='utf-8') as in_file:
             yaml_content = in_file.read()
-            cfg_items = yaml.load(yaml_content)
+            cfg_items = yaml.load_all(yaml_content, Loader=yaml.FullLoader)
 
 
 legendName = [
