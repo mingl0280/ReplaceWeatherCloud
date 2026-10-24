@@ -5,6 +5,8 @@ import os
 import tempfile
 import threading
 import unittest
+import os
+import tempfile
 
 import httpx
 import psycopg
@@ -19,6 +21,11 @@ from scripts import db_ops
 class DatabaseTests(unittest.TestCase):
     def setUp(self):
         main._successful_writes.clear()
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        environment = patch.dict(os.environ, {"FAKEWEATHER_FAILED_DIR": directory.name})
+        environment.start()
+        self.addCleanup(environment.stop)
 
     def connection(self):
         connection = MagicMock()

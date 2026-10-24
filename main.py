@@ -38,6 +38,7 @@ from starlette.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
 import scripts.db_ops
+from scripts.failed_records import save_failed_record
 from scripts.configs import check_config, solar_window_size, rain_window_size, barometer_window_size, GlobalConfig
 from scripts.db_ops import get_raw_wind_by_time, get_raw_rain_by_time, get_raw_temp_by_time, get_raw_barometer_by_time, \
     get_raw_solar_by_time
@@ -318,7 +319,20 @@ async def set_api(wid: str, key: str, tempin: int, humin: int,
         await run_in_threadpool(scripts.db_ops.insert_record, record)
     except Exception as error:
         logging.error("Weather record insert failed (%s)", type(error).__name__)
-        return JSONResponse(status_code=503, content={"error": "Database write failed"})
+        try:
+            saved_path = await run_in_threadpool(save_failed_record, record, error)
+        except Exception as disk_error:
+            logging.critical("Failed to persist weather recovery record (%s)", type(disk_error).__name__)
+            return JSONResponse(status_code=503, content={
+                "error": "Database write failed; recovery file could not be saved",
+                "saved_for_recovery": False,
+            })
+        logging.warning("Weather record saved for recovery: %s", saved_path.name)
+        return JSONResponse(status_code=503, content={
+            "error": "Database write failed",
+            "saved_for_recovery": True,
+            "recovery_id": saved_path.stem,
+        })
 
     return 200
 
