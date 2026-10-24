@@ -1550,6 +1550,7 @@
                         if (out_data[idx][baro_dims.baro] < baro_min)
                             baro_min = out_data[idx][baro_dims.baro];
                     }
+                    if (!out_data.length) { baro_min = 0; baro_max = 1; }
                     this.option.visualMap[0].max = baro_max;
                     this.option.visualMap[0].min = baro_min;
                     this.option.visualMap[0].text = [other_tooltip_translate[target_lang].barometer + "\r\n" + baro_max.toString() + " hPa", baro_min.toString() + " hPa"];
@@ -1558,7 +1559,7 @@
                     this.option.series[1].data = out_data;
 
                     //this.option.series[0].markPoint.data[2].yAxis = out_data[out_data.length-1][baro_dims.baro];
-                    this.option.graphic[0].style.text = other_tooltip_translate[target_lang].current_baro + ": " + out_data[0][baro_dims.raw_baro] + " hPa";
+                    this.option.graphic[0].style.text = other_tooltip_translate[target_lang].current_baro + ": " + (out_data.length ? out_data[0][baro_dims.raw_baro] + " hPa" : "—");
                     //this.option.series[1].data = out_data;
                     this.$forceUpdate()
 

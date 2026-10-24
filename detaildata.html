@@ -1378,6 +1378,7 @@
                         if (out_data[idx][baro_dims.baro] < baro_min)
                             baro_min = out_data[idx][baro_dims.baro];
                     }
+                    if (!out_data.length) { baro_min = 0; baro_max = 1; }
                     this.option.visualMap[0].max = baro_max;
                     this.option.visualMap[0].min = baro_min;
                     this.option.visualMap[0].text = [other_tooltip_translate[target_lang].barometer + "\r\n" + baro_max.toString() + " hPa", baro_min.toString() + " hPa"];
@@ -1386,7 +1387,7 @@
                     this.option.series[1].data = out_data;
 
                     //this.option.series[0].markPoint.data[2].yAxis = out_data[out_data.length-1][baro_dims.baro];
-                    this.option.graphic[0].style.text = other_tooltip_translate[target_lang].current_baro + ": " + out_data[0][baro_dims.raw_baro] + " hPa";
+                    this.option.graphic[0].style.text = other_tooltip_translate[target_lang].current_baro + ": " + (out_data.length ? out_data[0][baro_dims.raw_baro] + " hPa" : "—");
                     //this.option.series[1].data = out_data;
                     this.$forceUpdate()
 
@@ -1409,7 +1410,7 @@
         el: "#time_selection_overall",
         data: {
             trns: {},
-            start_date_time: moment().format('YYYY-MM-DD HH:mm:ss'),
+            start_date_time: moment().subtract(1, 'hours').format('YYYY-MM-DD HH:mm:ss'),
             end_date_time: moment().format('YYYY-MM-DD HH:mm:ss'),
             start_datetime_err_msg: "",
             end_datetime_err_msg: "",
@@ -1419,8 +1420,13 @@
             {
                 check_date_run: function () {
                     let val_now = moment();
-                    let val_start = moment(this.start_date_time, 'YYYY-MM-DD HH:mm:ss');
-                    let val_end = moment(this.end_date_time, 'YYYY-MM-DD HH:mm:ss');
+                    let val_start = moment(this.start_date_time, 'YYYY-MM-DD HH:mm:ss', true);
+                    let val_end = moment(this.end_date_time, 'YYYY-MM-DD HH:mm:ss', true);
+                    if (!val_start.isValid() || !val_end.isValid()) {
+                        this.start_datetime_err_msg = "YYYY-MM-DD HH:mm:ss";
+                        this.end_datetime_err_msg = "YYYY-MM-DD HH:mm:ss";
+                        return;
+                    }
                     if (val_start.isAfter(val_now)) {
                         this.start_datetime_err_msg = this.trns.start_date_time_alt_text + this.trns.not_later_than + this.trns.today_text;
                         return;
@@ -1542,6 +1548,6 @@
 
     //var update_rmap = setInterval(update_values, 10000);
 
-    update_values();
+    date_time_select_obj.check_date_run();
 
 </script>
