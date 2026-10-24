@@ -1,36 +1,53 @@
-import shutil
-from os.path import exists
+"""Load configuration independently of the process working directory."""
+from pathlib import Path
 
 import yaml
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
 
 class Config:
-    def __init__(self):
-        if exists("config.yaml"):
-            with open("config.yaml", 'r', encoding='utf-8') as self.in_file:
-                self.yaml_content = self.in_file.read()
-                self.cfg = yaml.safe_load(self.yaml_content)  # Use safe_load for a single document
-                self.init_ok = True
-        else:
-            shutil.copy("default.yaml", "config.yaml")
-            print("Please edit config.yaml to represent your current configuration!")
-            print("App will now quit.")
-            self.init_ok = False
+    def __init__(self, path=None):
+        self.path = Path(path) if path is not None else PROJECT_ROOT / "config.yaml"
+        self.init_ok = False
+        try:
+            with self.path.open(encoding="utf-8") as config_file:
+                cfg = yaml.safe_load(config_file)
+        except FileNotFoundError as exc:
+            raise RuntimeError(
+                f"Configuration missing: {self.path}. Copy default.yaml to this path "
+                "and configure the server and database before starting."
+            ) from exc
+        except yaml.YAMLError:
+            # Parser diagnostics can contain database credentials from the source.
+            raise RuntimeError(f"Invalid YAML in {self.path}; check its syntax.") from None
+        if not isinstance(cfg, dict):
+            raise RuntimeError(f"Configuration {self.path} must be a mapping.")
+        server = cfg.get("server")
+        database = cfg.get("database")
+        if not isinstance(server, dict) or not isinstance(database, dict):
+            raise RuntimeError("Configuration requires server and database mappings.")
+        for key in ("host", "log_level"):
+            if not isinstance(server.get(key), str) or not server[key].strip():
+                raise RuntimeError(f"Configuration server.{key} must be a nonempty string.")
+        port = server.get("port")
+        if isinstance(port, bool) or not isinstance(port, int) or not 1 <= port <= 65535:
+            raise RuntimeError("Configuration server.port must be an integer from 1 to 65535.")
+        connection_str = database.get("connection_str")
+        if not isinstance(connection_str, str) or not connection_str.strip():
+            raise RuntimeError("Configuration database.connection_str must be a nonempty string.")
+        self.cfg = cfg
+        self.init_ok = True
 
 
-GlobalConfig: Config = Config()
+GlobalConfig = Config()
 
 
 def check_config():
-    if not exists("config.yaml"):
-        shutil.copy("default.yaml", "config.yaml")
-        print("Please edit config.yaml to represent your current configuration!")
-        print("App will now quit.")
-        exit(0)
-    else:
-        with open("config.yaml", 'r', encoding='utf-8') as in_file:
-            yaml_content = in_file.read()
-            cfg_items = yaml.load_all(yaml_content, Loader=yaml.FullLoader)
+    """Return the configuration already validated at startup."""
+    if not GlobalConfig.init_ok:
+        raise RuntimeError("Configuration has not been initialized.")
+    return GlobalConfig.cfg
 
 
 legendName = [

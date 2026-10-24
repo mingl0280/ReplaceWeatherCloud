@@ -1,26 +1,17 @@
+"""Create a fresh schema using the configured database role.
+
+Run python -m scripts.create_db (or python create_db.py) deliberately against a
+new database. Existing tables cause rollback; this is not a migration tool.
+"""
+import sys
+from pathlib import Path
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 import psycopg
-import shutil
-from os.path import exists
-import yaml
 
-if not exists("../config.yaml"):
-    shutil.copy("../default.yaml", "config.yaml")
-    print("Please edit config.yaml to represent your current configuration!")
-    print("App will now quit.")
-    exit(0)
-else:
-    with open("../config.yaml", 'r', encoding='utf-8') as in_file:
-        yaml_content = in_file.read()
-        cfg_items = yaml.load(yaml_content)
-
-
-def create_db():
-    try:
-        db_conn = psycopg.connect(cfg_items["database"]["connection_str"])
-        cursor = db_conn.cursor()
-
-        cursor.execute("""
-                create table weather_data
+SCHEMA_SQL = """create table weather_data
             (
                 index_id           bigserial      not null primary key,
                 localdatetime      timestamp(0)   not null,
@@ -46,17 +37,29 @@ def create_db():
                 batterystate       varchar(32)    not null,
                 heat               numeric(8, 2)  not null
             );
-            
-            alter table weather_data
-                owner to postgres;
-            CREATE INDEX "idx_ldt" ON "public"."weather_data" USING btree (
-            "localdatetime");
-            CREATE INDEX "idx_id" ON "public"."weather_data" USING btree (
-            "index_id");
-            
-            grant delete, insert, references, select, trigger, truncate, update on weather_data to weatherman;
-            grant ALL PRIVILEGES on ALL SEQUENCES IN SCHEMA public TO weatherman;
-            """)
-    except:
-        print("DB Operation failed!")
-        print("Please check if you have configured the database connection in config.yaml!")
+CREATE INDEX idx_ldt ON weather_data (localdatetime);"""
+
+
+def create_db(connection_str=None):
+    if connection_str is None:
+        from scripts.configs import check_config
+        connection_str = check_config()["database"]["connection_str"]
+    # Psycopg commits on normal context exit and rolls back on any exception.
+    with psycopg.connect(connection_str) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(SCHEMA_SQL)
+
+
+def main():
+    try:
+        create_db()
+    except (psycopg.Error, RuntimeError) as exc:
+        print(f"Schema creation failed ({type(exc).__name__}); check configuration, "
+              "database permissions, and whether weather_data already exists.", file=sys.stderr)
+        return 1
+    print("Weather schema created successfully.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
