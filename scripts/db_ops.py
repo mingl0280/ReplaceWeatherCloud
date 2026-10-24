@@ -4,24 +4,14 @@ from psycopg.rows import dict_row
 
 from scripts.configs import GlobalConfig
 
-import logging
 
 async def query_db_by_time(sql_query_str: str,
                            start_timestamp: str = Query(None, alias="startTime"),
                            end_timestamp: str = Query(None, alias="endTime")):
-    global db_conn
-    check_db()
-
-    try:
-        result = db_conn.cursor().execute(sql_query_str, {
-            "sttms": start_timestamp,
-            "edtms": end_timestamp
-        }, prepare=True)
-    except Exception as e:
-        db_conn.close()
-        return str(e)
-
-    return result.fetchall()
+    return fetch_all(sql_query_str, {
+        "sttms": start_timestamp,
+        "edtms": end_timestamp,
+    })
 
 
 async def get_raw_wind_by_time(start_timestamp: str = Query(None, alias="startTime"),
@@ -75,17 +65,52 @@ async def get_raw_solar_by_time(start_timestamp: str = Query(None, alias="startT
                                   end_timestamp=end_timestamp)
 
 
-def check_db():
-    global db_conn
-    logging.info(GlobalConfig.cfg["database"]["connection_str"])
-    if db_conn.broken:
-        db_conn.close()
-        db_conn = psycopg.connect(GlobalConfig.cfg["database"]["connection_str"], row_factory=dict_row)
-        db_conn.prepare_threshold = 0
 
-    if db_conn.closed:
-        db_conn = psycopg.connect(GlobalConfig.cfg["database"]["connection_str"], row_factory=dict_row)
-        db_conn.prepare_threshold = 0
+def connect():
+    """Open a bounded connection owned by one operation, never by the module."""
+    return psycopg.connect(
+        GlobalConfig.cfg["database"]["connection_str"],
+        row_factory=dict_row,
+        autocommit=True,
+        connect_timeout=5,
+        options="-c statement_timeout=15000 -c lock_timeout=5000",
+    )
 
 
-db_conn: psycopg.Connection = psycopg.connect(GlobalConfig.cfg["database"]["connection_str"], row_factory=dict_row)
+def fetch_all(query, parameters=None):
+    with connect() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(query, parameters)
+            return cursor.fetchall()
+
+
+def fetch_one(query, parameters=None):
+    with connect() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(query, parameters)
+            return cursor.fetchone()
+
+
+INSERT_RECORD_SQL = """
+    INSERT INTO weather_data
+    (localdatetime, tempindoor, humindoor, tempoutdoor, humoutdoor, dewindoor,
+     dewoutdoor, "WindChill", heatindex, temphumidwindindex, barometer, windspd,
+     highwindspd, winddirection, avgwindspd, avgwinddir, rainrate, raindaily,
+     solarrad, uvindex, batterystate, heat)
+    VALUES
+    (%(dateobj)s, %(temp_in)s, %(hum_in)s, %(temp_out)s, %(hum_out)s, %(dew_in)s,
+     %(dew_out)s, %(chill_idx)s, %(heatindex)s, %(thw_idx)s, %(baro)s, %(wind_spd)s,
+     %(high_wind)s, %(wind_dir)s, %(avg_wind_spd)s, %(avg_wind_dir)s, %(rainrate)s,
+     %(raindaily)s, %(solar_rad)s, %(uvi)s, %(batt)s, %(heat)s)
+"""
+
+
+def insert_record(record):
+    """Commit exactly one normalized record; rollback and close on any failure.
+
+    Do not automatically retry: a lost commit acknowledgement is ambiguous.
+    """
+    with connect() as connection:
+        with connection.transaction():
+            with connection.cursor() as cursor:
+                cursor.execute(INSERT_RECORD_SQL, record)
