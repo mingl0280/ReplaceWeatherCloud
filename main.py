@@ -26,13 +26,16 @@ import time
 from collections import OrderedDict
 from datetime import datetime as dt
 from decimal import Decimal
+from pathlib import Path
 from typing import Optional
 
+import psycopg
 import uvicorn
 from fastapi import FastAPI, Query, Request, Response
 from starlette.responses import JSONResponse
 from starlette.responses import FileResponse
 from starlette.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 
 import scripts.db_ops
 from scripts.configs import check_config, solar_window_size, rain_window_size, barometer_window_size, GlobalConfig
@@ -46,11 +49,18 @@ check_config()
 
 app = FastAPI()
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+BASE_DIR = Path(__file__).resolve().parent
+app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+
+
+@app.exception_handler(psycopg.Error)
+async def database_error_handler(request: Request, error: psycopg.Error):
+    logging.error("Database operation failed (%s)", type(error).__name__)
+    return JSONResponse(status_code=503, content={"error": "Database unavailable"})
 
 @app.get("/")
 async def root():
-    return FileResponse('index.html')
+    return FileResponse(BASE_DIR / "index.html")
 
 # Bound station retries without retaining API keys or acknowledging failed writes.
 _successful_writes = OrderedDict()
@@ -84,12 +94,12 @@ async def deduplication_middleware(request: Request, call_next):
 
 @app.get("/detaildata.html")
 async def detail_response():
-    return FileResponse('detaildata.html')
+    return FileResponse(BASE_DIR / "detaildata.html")
 
 
 @app.get("/favicon.ico")
 async def icon_ret():
-    return FileResponse('favicon.ico')
+    return FileResponse(BASE_DIR / "favicon.ico")
 
 
 async def get_wind(prior_days: Optional[int] = Query(None, alias="priorDays"),
@@ -98,7 +108,7 @@ async def get_wind(prior_days: Optional[int] = Query(None, alias="priorDays"),
 
     sql_query_str = \
         "SELECT localdatetime as \"Time\", windspd AS \"Speed\", highwindspd AS \"Gust\", winddirection AS \"Direction\" FROM weather_data " + where_str + " ORDER BY localdatetime DESC"
-    return scripts.db_ops.fetch_all(sql_query_str)
+    return await run_in_threadpool(scripts.db_ops.fetch_all, sql_query_str)
 
 
 async def get_raw_baro(prior_days: Optional[int] = Query(None, alias="priorDays"),
@@ -106,7 +116,7 @@ async def get_raw_baro(prior_days: Optional[int] = Query(None, alias="priorDays"
     where_str = get_interval_where_str(prior_days, prior_hrs)
     sql_query_str = "SELECT localdatetime AS \"Time\", barometer as \"Baro\", index_id FROM weather_data " + where_str + \
                     " ORDER BY localdatetime DESC"
-    data = scripts.db_ops.fetch_all(sql_query_str)
+    data = await run_in_threadpool(scripts.db_ops.fetch_all, sql_query_str)
 
     return data
 
@@ -118,7 +128,7 @@ async def get_solar(prior_days: Optional[int] = Query(None, alias="priorDays"),
     sql_query_str = "SELECT localdatetime AS \"Time\", solarrad as \"Solar\"," \
                     " index_id FROM weather_data " + where_str + \
                     " ORDER BY localdatetime DESC"
-    data = scripts.db_ops.fetch_all(sql_query_str)
+    data = await run_in_threadpool(scripts.db_ops.fetch_all, sql_query_str)
     return process_solar_data(data, solar_window_size)
 
 
@@ -128,7 +138,7 @@ async def get_rain(prior_days: Optional[int] = Query(None, alias="priorDays"),
     where_str = get_interval_where_str(prior_days, prior_hrs)
     sql_query_str = "SELECT localdatetime AS \"Time\", rainrate as \"Rain\" FROM weather_data " + where_str + \
                     " ORDER BY localdatetime DESC"
-    data = scripts.db_ops.fetch_all(sql_query_str)
+    data = await run_in_threadpool(scripts.db_ops.fetch_all, sql_query_str)
 
     return process_rain_data(raw_data=data, sliding_window=rain_window_size)
 
@@ -139,7 +149,7 @@ async def get_temp(prior_days: Optional[int] = Query(None, alias="priorDays"),
     where_str = get_interval_where_str(prior_days, prior_hrs)
     sql_query_str = "SELECT localdatetime AS \"Time\", tempoutdoor as \"TempOut\", tempindoor AS \"TempIn\"  FROM weather_data {0} ORDER BY localdatetime DESC".format(
         where_str)
-    data = scripts.db_ops.fetch_all(sql_query_str)
+    data = await run_in_threadpool(scripts.db_ops.fetch_all, sql_query_str)
     return_data = []
 
     for item in data:
@@ -305,20 +315,12 @@ async def set_api(wid: str, key: str, tempin: int, humin: int,
     }
 
     try:
-        scripts.db_ops.insert_record(record)
-    except Exception:
-        logging.exception("Weather record insert failed")
+        await run_in_threadpool(scripts.db_ops.insert_record, record)
+    except Exception as error:
+        logging.error("Weather record insert failed (%s)", type(error).__name__)
         return JSONResponse(status_code=503, content={"error": "Database write failed"})
 
     return 200
-
-
-if __name__ == "__main__":
-    if not GlobalConfig.init_ok:
-        exit(0)
-
-    uvicorn.run("main:app", host=GlobalConfig.cfg["server"]["host"],
-                port=GlobalConfig.cfg["server"]["port"], log_level=GlobalConfig.cfg["server"]["log_level"])
 
 
 @app.get("/api/latest")
@@ -358,4 +360,14 @@ async def latest_info(altitude: Optional[int] = Query(None, alias="altitude")):
         weather_data.localdatetime DESC
     LIMIT 1""".format(baro_abs_stmt)
 
-    return scripts.db_ops.fetch_one(sql_stmt)
+    return await run_in_threadpool(scripts.db_ops.fetch_one, sql_stmt)
+
+
+if __name__ == "__main__":
+    if not GlobalConfig.init_ok:
+        exit(0)
+
+    uvicorn.run(app, host=GlobalConfig.cfg["server"]["host"],
+                port=GlobalConfig.cfg["server"]["port"], log_level=GlobalConfig.cfg["server"]["log_level"])
+
+

@@ -1,6 +1,7 @@
 import psycopg
 from fastapi import Query
 from psycopg.rows import dict_row
+from starlette.concurrency import run_in_threadpool
 
 from scripts.configs import GlobalConfig
 
@@ -8,7 +9,7 @@ from scripts.configs import GlobalConfig
 async def query_db_by_time(sql_query_str: str,
                            start_timestamp: str = Query(None, alias="startTime"),
                            end_timestamp: str = Query(None, alias="endTime")):
-    return fetch_all(sql_query_str, {
+    return await run_in_threadpool(fetch_all, sql_query_str, {
         "sttms": start_timestamp,
         "edtms": end_timestamp,
     })

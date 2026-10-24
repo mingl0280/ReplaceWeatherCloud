@@ -1,5 +1,13 @@
 """Regression checks for connection recovery and write endpoint responses."""
+import asyncio
+import inspect
+import os
+import tempfile
+import threading
 import unittest
+
+import httpx
+import psycopg
 from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
@@ -82,6 +90,63 @@ class DatabaseTests(unittest.TestCase):
         self.assertEqual(record["solar_rad"], 150)
         self.assertEqual(record["uvi"], 20)
         self.assertNotIn("key", record)
+
+
+class AsyncDatabaseTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        main._successful_writes.clear()
+        main._write_lock = asyncio.Lock()
+
+    async def test_slow_write_does_not_block_homepage(self):
+        started = threading.Event()
+        release = threading.Event()
+
+        def slow_insert(record):
+            started.set()
+            if not release.wait(3):
+                raise RuntimeError("test release timed out")
+
+        parameters = {
+            name: ("test" if param.annotation is str else 100)
+            for name, param in inspect.signature(main.set_api).parameters.items()
+            if param.default is inspect.Parameter.empty
+        }
+        transport = httpx.ASGITransport(app=main.app)
+        with patch.object(db_ops, "insert_record", side_effect=slow_insert):
+            async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+                writing = asyncio.create_task(client.get("/v01/set", params=parameters))
+                try:
+                    self.assertTrue(await asyncio.to_thread(started.wait, 2))
+                    response = await asyncio.wait_for(client.get("/"), timeout=1)
+                    self.assertEqual(response.status_code, 200)
+                    self.assertFalse(writing.done(), "write must still await release")
+                finally:
+                    release.set()
+                    response = await writing
+                self.assertEqual(response.status_code, 200)
+
+    async def test_read_error_is_sanitized_503(self):
+        transport = httpx.ASGITransport(app=main.app)
+        with patch.object(db_ops, "fetch_one", side_effect=psycopg.OperationalError("secret-password")):
+            with self.assertLogs(level="ERROR") as logs:
+                async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+                    response = await client.get("/api/latest")
+        self.assertEqual(response.status_code, 503)
+        self.assertNotIn("secret-password", response.text)
+        self.assertNotIn("secret-password", "".join(logs.output))
+
+    async def test_static_files_are_independent_of_working_directory(self):
+        original_directory = os.getcwd()
+        transport = httpx.ASGITransport(app=main.app)
+        with tempfile.TemporaryDirectory() as directory:
+            try:
+                os.chdir(directory)
+                async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+                    for url in ("/", "/detaildata.html", "/static/css/page_custom_styles.css"):
+                        response = await client.get(url)
+                        self.assertEqual(response.status_code, 200, url)
+            finally:
+                os.chdir(original_directory)
 
 
 if __name__ == "__main__":
