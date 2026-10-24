@@ -1,42 +1,35 @@
-import math
-from collections import deque
 from datetime import datetime as dt, timedelta
 from decimal import Decimal
+
+from fastapi import HTTPException
 
 from scripts.configs import legendName
 from scripts.RoseMapDirItem import RoseMapDirItem
 
 
 def sliding_average(data, col_num, window_size, round_digits):
-    tmp_arr = []
-    index = 0
-    half_size = math.floor(window_size / 2)
-    for x in range(0, math.floor(window_size / 2)):
-        tmp_arr.append(data[0][col_num])
+    """Smooth every row, repeating endpoint values outside the data range.
 
-    for item in data:
-        tmp_arr.append(item[col_num])
-        index += 1
-
-    for x in range(0, math.floor(window_size / 2)):
-        tmp_arr.append(data[-1][col_num])
-
-    dq = deque(tmp_arr[:window_size])
-
-    s = sum(dq)
-    arr_avg = []
-
-    for i in range(half_size, len(tmp_arr)):
-        s += tmp_arr[i] - dq.popleft()
-        dq.append(tmp_arr[i])
-        arr_avg.append(round(s / window_size, round_digits))
-
-    ret_data = data
-
-    for i in range(0, index - 1):
-        ret_data[i][col_num] = arr_avg[i + half_size]
-
-    return ret_data
+    Even windows contain one more preceding than following value. Return
+    copied rows so callers can retain their raw observations.
+    """
+    if not isinstance(window_size, int) or window_size < 1:
+        raise ValueError("window_size must be a positive integer")
+    if not data:
+        return []
+    left = window_size // 2
+    right = window_size - left - 1
+    values = [row[col_num] for row in data]
+    padded = [values[0]] * left + values + [values[-1]] * right
+    total = sum(padded[:window_size])
+    result = []
+    for index, row in enumerate(data):
+        if index:
+            total += padded[index + window_size - 1] - padded[index - 1]
+        smoothed = list(row)
+        smoothed[col_num] = round(total / window_size, round_digits)
+        result.append(smoothed)
+    return result
 
 
 def get_dir_from_angle(angle: int):
@@ -95,11 +88,11 @@ def process_wind_data(raw_data, window_size: int):
     for data_item in raw_data:
         data_remap.append([
             data_item["Time"],
-            round(data_item["Speed"] * Decimal(1.9438444924), 2),
+            round(data_item["Speed"] * Decimal("1.9438444924"), 2),
             round((270 - data_item["Direction"]) * 3.141592654 / 180, 3),
-            round(data_item["Gust"] * Decimal(1.9438444924), 2),
-            round(data_item["Gust"] * Decimal(1.9438444924), 2),
-            round(data_item["Speed"] * Decimal(1.9438444924), 2),
+            round(data_item["Gust"] * Decimal("1.9438444924"), 2),
+            round(data_item["Gust"] * Decimal("1.9438444924"), 2),
+            round(data_item["Speed"] * Decimal("1.9438444924"), 2),
             # round(speed_filter.calc_new_data(data_item["Speed"]) * Decimal(1.9438444924), 2),
             # round((270 - data_item["Direction"]) * 3.141592654 / 180, 3),
             # round(data_item["Gust"] * Decimal(1.9438444924), 2),
@@ -171,18 +164,11 @@ def altitude_fix(relative_pressure: Decimal, altitude: int):
 
 
 async def get_timediff_wind_window_size(prior_days, prior_hrs):
-    window_size = 5
-    if (prior_days == 0 or prior_days is None) and prior_hrs <= 3:
-        pass
-    else:
-        if (prior_days == 0 or prior_days is None) and 2 < prior_hrs < 10:
-            window_size = 15
-        else:
-            if prior_days > 2:
-                window_size = 240
-            else:
-                window_size = 30
-    return window_size
+    if prior_days:
+        return 240 if prior_days > 2 else 30
+    if prior_hrs is None or prior_hrs <= 3:
+        return 5
+    return 15 if prior_hrs < 10 else 30
 
 
 def process_rose_map(raw_data, speed_type):
@@ -233,8 +219,15 @@ def process_rose_map(raw_data, speed_type):
 
 
 def make_times_limited(start_timestamp, end_timestamp):
-    start_time_obj = dt.strptime(start_timestamp, '%Y-%m-%d %H:%M:%S')
-    end_time_obj = dt.strptime(end_timestamp, '%Y-%m-%d %H:%M:%S')
+    try:
+        start_time_obj = dt.strptime(start_timestamp, '%Y-%m-%d %H:%M:%S')
+        end_time_obj = dt.strptime(end_timestamp, '%Y-%m-%d %H:%M:%S')
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=422, detail="startTime and endTime must use YYYY-MM-DD HH:MM:SS"
+        ) from exc
+    if end_time_obj < start_time_obj:
+        raise HTTPException(status_code=422, detail="endTime must not precede startTime")
     time_diff = end_time_obj - start_time_obj
     if time_diff > timedelta(hours=48):
         end_time_obj = start_time_obj + timedelta(hours=48)
@@ -246,18 +239,17 @@ def make_times_limited(start_timestamp, end_timestamp):
 async def process_temperature_units(raw_data, unit):
     return_data = []
     # Ax+B conversion
-    conversion_A = 1.00
-    conversion_B = 0.00
+    conversion_A = Decimal("1")
+    conversion_B = Decimal("0")
     if unit == 1:
-        conversion_A = 1.80
-        conversion_B = 32.00
+        conversion_A = Decimal("1.8")
+        conversion_B = Decimal("32")
     if unit == 2:
-        conversion_A = 1.00
-        conversion_B = 273.15
+        conversion_B = Decimal("273.15")
     for item in raw_data:
         return_data.append([
             item["Time"],
-            round(item["TempOut"] * Decimal(conversion_A) + Decimal(conversion_B), 2 if conversion_A == 1.00 else 1),
-            round(item['TempIn'] * Decimal(conversion_A) + Decimal(conversion_B), 2 if conversion_A == 1.00 else 1)
+            round(item["TempOut"] * conversion_A + conversion_B, 2 if conversion_A == 1 else 1),
+            round(item['TempIn'] * conversion_A + conversion_B, 2 if conversion_A == 1 else 1)
         ])
     return return_data
