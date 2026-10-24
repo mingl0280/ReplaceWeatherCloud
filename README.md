@@ -32,15 +32,13 @@ pip install -r requirements.txt
 ```
 
 ## Database setup
-- You need a user called "weatherman" (or whatever you like - just remember to change the username in the config.yaml and create_db.py)
-- Run `python create_db.py` to create the data storage tabel.
+- Configure a database role in `config.yaml` with the required table permissions.
+- For a new database only, run `python create_db.py` to create the storage table.
 
 ## Run the site
 You have 2 options to run the website:
 1. run `./run.sh` and it will listen on 0.0.0.0 at port 8000 (behind nginx).
 2. run `python main.py` and it should pull in configurations from config.yaml. 
-
-## Other tasks to do
 
 ## Recovery and validation
 
@@ -59,6 +57,9 @@ The explicit `python tests/integration_postgres.py` test requires database schem
 creation permission and creates and removes only an isolated temporary schema.
 
 See [review findings](docs/review.md) for the failure diagnosis and validation.
+
+## Other tasks to do
+
 - ~~Not support switching between units. For example, Celsius to Fahrenheit or m/s to km/h to knots.~~
 - Now supported switching temperature units in detaildata.html.
 - May need more language support

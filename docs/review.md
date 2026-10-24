@@ -42,6 +42,20 @@ schema, covering refused connections, SQL/constraint errors, recovery files,
 receipt rollback, and an archival failure after a successful replay commit.
 The temporary schema was removed afterward.
 
+## Deployment verification
+
+The reviewed source was deployed to `/var/www/fakeweather`, and only
+`weather.service` was restarted. The original source backup is
+`/var/backups/fakeweather/source-before-20261024-review.tar.gz`.
+
+The Browser verified the dashboard, history charts, native date controls, and
+an empty historical range without console errors. A tagged browser GET write
+created PostgreSQL row `1310464` at `2026-10-24 08:58:41` server local time.
+The exact tagged test row was removed after verification. Real station rows
+continued arriving afterward. All current-data endpoints returned HTTP 200;
+empty historical endpoints returned empty arrays; malformed timestamps returned
+HTTP 422. No application errors appeared in the new service invocation.
+
 The wire protocol remains unchanged. Its `wid`, `key`, `date`, and `time`
 parameters retain their existing behavior; this update does not introduce
 station authentication or reinterpret timestamps. Existing proxy/access logs
